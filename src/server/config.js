@@ -73,10 +73,10 @@ export const CONFIG = {
     host: process.env.GATEWAY_HOST || '0.0.0.0',
 
     // 目标后端服务地址
-    targetBaseUrl: process.env.TARGET_URL || 'http://localhost:8080',
+    targetBaseUrl: process.env.TARGET_URL,
 
     // 数据库配置（放在 src/server/ 目录下）
-    dbPath: process.env.DB_PATH || join(__dirname, 'gateway.db'),
+    dbPath: process.env.DB_PATH,
 
     // 清理配置
     cleanupDays: parseInt(process.env.CLEANUP_DAYS) || 30,
