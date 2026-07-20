@@ -1,93 +1,85 @@
-# 🤖 Agent Hub Node
+# Cloudflare Worker 项目配置说明
 
-> 一个基于 Node.js 的 AI 智能体聚合与管理平台
+## 配置文件说明
 
-## 📖 项目简介
+本项目使用 `wrangler.jsonc` 作为配置文件，实现了以下功能：
 
-**Agent Hub Node** 是一个轻量级、可扩展的 AI 代理网站后端服务。旨在为开发者提供一个统一的入口，用于注册、管理、调度各类 AI 智能体（Agents），并支持通过标准化接口进行任务分发与结果回调。
+1. 代码压缩（minify）
+2. dev 和 deploy 环境变量配置
 
-## ✨ 核心特性
+## 配置详情
 
-- 🚀 **高性能**：基于 Node.js + TypeScript 构建，非阻塞 I/O 处理高并发请求。
-- 🔌 **插件化架构**：支持动态加载 Agent 插件，热插拔无需重启服务。
-- 🛡️ **安全网关**：内置 API Key 鉴权、速率限制与请求日志审计。
-- 📊 **监控面板**：实时查看 Agent 运行状态、Token 消耗与任务队列。
-- 🔄 **多协议支持**：兼容 OpenAI Function Calling、LangChain 及自定义 Webhook。
+### 代码压缩
 
-## 🛠️ 技术栈
+```json
+{
+  "minify": true
+}
+```
 
-- **Runtime**: Node.js >= 18.0
-- **Language**: TypeScript
-- **Framework**: NestJS / Express (可选)
-- **Database**: PostgreSQL / MongoDB
-- **Cache**: Redis
+### 环境变量配置
 
-## 🚀 快速开始
+```json
+{
+  "vars": {
+    "ENVIRONMENT": "development"
+  },
+  "env": {
+    "deploy": {
+      "vars": {
+        "ENVIRONMENT": "production"
+      }
+    }
+  }
+}
+```
 
-### 1. 克隆项目
+## 使用说明
+
+### 开发环境
+
+运行以下命令启动开发服务器：
 
 ```bash
-git clone https://github.com/your-username/agent-hub-node.git
-cd agent-hub-node
+npx wrangler dev
 ```
 
-### 2. 安装依赖
+在开发环境中，`ENVIRONMENT` 变量被设置为 `development`。
+
+### 构建项目
+
+运行以下命令构建项目：
 
 ```bash
-npm install
-# 或
-pnpm install
+npm run build
 ```
 
-### 3. 配置环境变量
+构建过程会自动移除所有文件中的 console 语句，包括：
+1. `src` 目录下自己代码中的 console 语句
+2. 第三方库中的 console 语句
 
-复制 `.env.example` 为 `.env` 并填写必要配置：
+然后生成优化后的代码。生成的代码位于 `dist/index.js` 文件中。
 
-```env
-PORT=3000
-DATABASE_URL="postgresql://user:password@localhost:5432/agent_hub"
-REDIS_URL="redis://localhost:6379"
-JWT_SECRET="your-super-secret-key"
-```
+这种方法的优点是：
+1. 不修改 `src` 目录下的原始代码
+2. 移除所有代码中的 console 语句，包括第三方库
+3. 通过构建过程自动完成，无需手动修改
 
-### 4. 启动开发服务
+### 部署环境
+
+运行以下命令部署到生产环境：
 
 ```bash
-npm run start:dev
+npx wrangler deploy --env deploy
 ```
 
-服务启动后访问：`http://localhost:3000/api/docs` 查看 Swagger 文档。
+在部署过程中，Wrangler 会自动执行以下步骤：
+1. 运行 `npm run build` 命令构建项目
+2. 构建过程会自动移除 `src` 目录下所有文件中的 console 语句
+3. 使用生成的 `dist/index.js` 文件进行部署
 
-## 📂 项目结构
+在部署环境中，`ENVIRONMENT` 变量被设置为 `production`。
 
-```text
-agent-hub-node/
-├── src/
-│   ├── agents/       # Agent 核心逻辑与插件
-│   ├── gateway/      # API 网关与鉴权中间件
-│   ├── queue/        # 任务队列处理
-│   ├── common/       # 通用工具与装饰器
-│   └── main.ts       # 入口文件
-├── test/             # 单元测试与集成测试
-├── .env.example      # 环境变量模板
-├── tsconfig.json     # TS 配置
-└── package.json
-```
+## 注意事项
 
-## 🤝 贡献指南
-
-1. Fork 本仓库
-2. 创建你的特性分支 (`git checkout -b feature/AmazingFeature`)
-3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
-4. 推送到分支 (`git push origin feature/AmazingFeature`)
-5. 开启一个 Pull Request
-
-## 📄 许可证
-
-本项目基于 [MIT License](LICENSE) 开源。
-
----
-
-<p align="center">
-  Made with ❤️ by <a href="https://github.com/your-username">Your Name</a>
-</p>
+1. 代码压缩通过 `minify` 选项实现。

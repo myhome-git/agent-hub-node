@@ -1,21 +1,34 @@
 {
-	"name": "agent-hub-node",
-	"version": "0.0.0",
-	"private": true,
-	"type": "module",
-	"scripts": {
-		"dev": "vite --host 0.0.0.0 --port 3000",
-		"start": "vite --host 0.0.0.0 --port 3000",
-		"build": "vite build"
-	},
-	"devDependencies": {
-		"esbuild": "^0.25.8"
-	},
-	"dependencies": {
-		"hono": "^4.8.9",
-		"path": "^0.12.7",
-		"sql.js": "^1.14.1",
-		"vite": "^8.1.5",
-		"ws": "^8.21.1"
-	}
+  "name": "mybook-api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun lint && bun --env-file .env.dev --hot src/index.ts",
+    "start": "bun lint && bun --env-file .env.prod --hot src/index.ts",
+    "build": "npm run lint && esbuild src/index.ts --bundle --minify --outfile=dist/index.js --format=esm --platform=node --target=es2022 --external:fs --external:path",
+    "lint": "eslint src/ --ext .js,.ts",
+    "lint:fix": "eslint src/ --ext .js,.ts --fix"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.8",
+    "eslint": "^9.39.2",
+    "ts-node": "^10.9.2",
+    "tsconfig-paths": "^4.2.0",
+    "vitest": "~3.2.0"
+  },
+  "dependencies": {
+    "@hono/session": "^0.2.0",
+    "@types/node": "^25.0.3",
+    "dayjs": "^1.11.19",
+    "esbuild-plugin-alias": "^0.2.1",
+    "hono": "^4.8.9",
+    "hono-sessions": "^0.8.0",
+    "module-alias": "^2.2.3",
+    "path": "^0.12.7",
+    "typescript": "^5.9.3"
+  },
+  "_moduleAliases": {
+    "@": "./src"
+  }
 }

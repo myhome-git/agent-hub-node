@@ -1,8 +1,10 @@
 import { Hono } from 'hono'
-const app = new Hono()
+
+// 创建路由实例
+const router = new Hono()
 
 // 处理请求
-app.get('/', async(c) => {
+router.get('/', async(c) => {
     // 获取参数
     const { uuid } = c.getValues()
 
@@ -10,4 +12,5 @@ app.get('/', async(c) => {
     return c.sendSuccess({ message: 'Hello from test!', uuid })
 })
 
-export default app
+// 导出路由
+export default router

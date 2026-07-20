@@ -5,9 +5,13 @@
  */
 
 import initSqlJs from 'sql.js';
-import { dirname } from 'path';
+import { dirname, join } from 'path';
+import { fileURLToPath } from 'url';
 import fs from 'fs';
 import CONFIG from './config.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 /**
  * 数据库管理器类
@@ -28,8 +32,12 @@ export class DatabaseManager {
         try {
             // 初始化 sql.js
             // wasm 文件在 node_modules/sql.js/dist/ 目录中
+            // 使用绝对路径，基于当前文件所在目录
+            const sqlDistPath = join(__dirname, '..', '..', 'node_modules', 'sql.js', 'dist');
+            console.log('[Database] SQL dist path:', sqlDistPath);
+            
             this.SQL = await initSqlJs({
-                locateFile: file => `./node_modules/sql.js/dist/${file}`
+                locateFile: file => `${sqlDistPath}/${file}`
             });
 
             // 加载现有数据库（如果存在）

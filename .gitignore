@@ -113,6 +113,7 @@ out
 # Nuxt.js build / generate output
 
 .nuxt
+dist
 
 # Gatsby files
 
@@ -170,5 +171,5 @@ out
 .dev.vars
 .wrangler/
 /.vscode
-/.env.dev
-/dist
+/database
+bun.lock
