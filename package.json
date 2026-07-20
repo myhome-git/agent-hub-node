@@ -1,0 +1,21 @@
+{
+	"name": "agent-hub-node",
+	"version": "0.0.0",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"dev": "vite --host 0.0.0.0 --port 3000",
+		"start": "vite --host 0.0.0.0 --port 3000",
+		"build": "vite build"
+	},
+	"devDependencies": {
+		"esbuild": "^0.25.8"
+	},
+	"dependencies": {
+		"hono": "^4.8.9",
+		"path": "^0.12.7",
+		"sql.js": "^1.14.1",
+		"vite": "^8.1.5",
+		"ws": "^8.21.1"
+	}
+}
