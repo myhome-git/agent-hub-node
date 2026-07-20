@@ -4,7 +4,6 @@
  * 负责数据库自动初始化、按分钟统计写入、定时清理
  */
 
-import initSqlJs from 'sql.js'
 import { dirname, join } from 'path'
 import { fileURLToPath } from 'url'
 import fs from 'fs'
@@ -21,7 +20,8 @@ export class DatabaseManager {
         this.dbPath = dbPath
         this.db = null
         this.SQL = null
-        this.init()
+        this._initPromise = this.init()
+        this.ready = this._initPromise // 暴露 ready 属性供外部等待
     }
 
     /**
@@ -67,6 +67,33 @@ export class DatabaseManager {
      * 创建数据库表
      */
     createTables() {
+        // 创建 Agent 表
+        this.exec(`
+            CREATE TABLE IF NOT EXISTS tb_agent (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                description TEXT DEFAULT '',
+                category TEXT DEFAULT '未分类',
+                status TEXT DEFAULT 'enabled',
+                config TEXT DEFAULT '{}',
+                avatar TEXT DEFAULT '',
+                create_time TEXT DEFAULT (datetime('now')),
+                update_time TEXT DEFAULT (datetime('now'))
+            );
+        `)
+
+        // 创建对话消息表
+        this.exec(`
+            CREATE TABLE IF NOT EXISTS tb_chat_message (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                agent_id INTEGER NOT NULL,
+                session_id TEXT NOT NULL,
+                role TEXT NOT NULL,
+                content TEXT NOT NULL,
+                create_time TEXT DEFAULT (datetime('now'))
+            );
+        `)
+
         // 创建分钟级统计表
         this.exec(`
             CREATE TABLE IF NOT EXISTS stats_minute (

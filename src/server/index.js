@@ -16,6 +16,7 @@ import { forwardRequest } from './gateway.js'
 import { initCleanupTask } from './cleanup.js'
 import CONFIG from './config.js'
 import { fileURLToPath } from 'url'
+import dayjs from 'dayjs'
 
 // 检测是否直接运行此文件
 const isDirectRun = process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]
@@ -27,14 +28,26 @@ const isDirectRun = process.argv[1] && fileURLToPath(import.meta.url) === proces
  * @param {string} options.host - 监听地址
  * @returns {Object} - 管理器集合
  */
-export function initGateway(options = {}) {
+export async function initGateway(options = {}) {
     const port = options.port || CONFIG.port
     const host = options.host || CONFIG.host
 
     // ==================== 初始化模块 ====================
 
-    // 创建数据库管理器
+    // 创建统计类对象
+    const netDataCount = {
+        // 统计变量
+        bytesIn: 0,
+        bytesOut: 0,
+        promptTokens: 0, //  (提示词 Token 数)
+        completionTokens: 0, //  (生成/回答 Token 数)
+        totalTokens: 0, // (总 Token 数)，本次交互消耗的总算力单位。计算公式：通常为 prompt + completion + reasoning。
+        reasoningTokens: 0 // (推理/思考 Token 数)
+    }
+
+    // 创建数据库管理器（等待初始化完成）
     const dbManager = new DatabaseManager(CONFIG.dbPath)
+    await dbManager.ready
 
     // 创建 WebSocket 管理器
     const wsManager = new WebSocketManager(CONFIG.wsPort)
@@ -51,6 +64,28 @@ export function initGateway(options = {}) {
     const managers = {
         dbManager,
         wsManager,
+        callback: {
+            first: async() => {
+                // 首次相应，统计发送数据
+                console.log('first')
+            },
+            promptByteLen: (len) => {
+                netDataCount.bytesIn += len
+            },
+            completionByteLen: (len) => {
+                netDataCount.bytesOut += len
+            },
+            completeTokens: ({ prompt, completion, reasoning, total }) => {
+                // { prompt: 0, completion: 0, reasoning: 1385, total: 1385 }
+                netDataCount.promptTokens += prompt
+                netDataCount.completionTokens += completion
+                netDataCount.reasoningTokens += reasoning
+                netDataCount.totalTokens += total
+            },
+            complete: () => {
+                console.log('complete', netDataCount)
+            }
+        }
     }
 
     // ==================== HTTP 服务器 ====================
@@ -131,11 +166,21 @@ export function initGateway(options = {}) {
     // ==================== 启动服务 ====================
 
     server.listen(port, host, () => {
+        // 获取统计数据
+        const stats = dbManager.getStats()
+        const summary = stats.summary
+        const totalPromptTokens = summary.total_prompt_tokens || 0
+        const totalCompletionTokens = summary.total_completion_tokens || 0
+        const totalTokens = summary.total_all_tokens || 0
+        const totalBytes = (summary.total_bytes_in || 0) + (summary.total_bytes_out || 0)
+        const totalMB = (totalBytes / 1024 / 1024).toFixed(2)
+
         console.log('[Gateway] HTTP 转发网关已启动')
         console.log(`[Gateway] 监听地址: http://${host}:${port}`)
         console.log(`[Gateway] 目标服务: ${CONFIG.targetBaseUrl}`)
         console.log(`[Gateway] WebSocket 监控: ws://${host}:${CONFIG.wsPort}`)
         console.log(`[Gateway] 数据库路径: ${CONFIG.dbPath}`)
+        console.log(`[Gateway] 输入Token：${totalPromptTokens.toLocaleString()}，输出Token：${totalCompletionTokens.toLocaleString()}，累计总Token：${totalTokens.toLocaleString()}，累计数据大小：${totalMB} MB`)
     })
 
     // ==================== 优雅关闭 ====================
@@ -172,3 +217,24 @@ if (isDirectRun) {
         host: '0.0.0.0',
     })
 }
+
+const now = dayjs(Date.now()).format('YYYY-MM-DD HH:mm:ss.SSS')
+console.log(`
+    ▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
+    █                                                                     █
+    █                   ▄▄▄▄ ▄▄▄▄▄▄   ▄▄   ▄▄ ▄▄▄▄▄▄                      █
+    █                  █      █   ▐█  ▐█ ▐▄█ █ █      █                   █
+    █                  █      █   ▐█  ▐█ ▐█ ▐█ █ ▄▄▄▄▄█                   █
+    █                  █      █   ▐█  ▐█ █▀▄▀█ █ █                        █
+    █                  █▄▄▄▄▄▄█   ▐█▄▄▄█ █   █ █ █▄▄▄▄▄▄                  █
+    █                                                                     █
+    █           Aent Hub v1.0.0 • High-Performance API Gateway            █
+    █           ────────────────────────────────────────────              █
+    █           • Uptime: ${now}                                          █
+    █                                                                     █
+    █           ▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄             █
+    █           █ STATUS 200 • Ready for incoming traffic   █             █
+    █           ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀             █
+    █                                                                     █
+    ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
+`)

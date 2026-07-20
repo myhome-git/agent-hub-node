@@ -6,6 +6,7 @@
 import http from 'http'
 import https from 'https'
 import { SSETokenParser } from './sse-parser.js'
+import { TokenCounter } from './sse-token-counter.js'
 import CONFIG from './config.js'
 
 /**
@@ -34,6 +35,7 @@ export async function forwardRequest(req, res, targetUrl, managers, options = {}
 
     // 创建 Token 解析器
     const tokenParser = new SSETokenParser()
+    const tokenCounter = new TokenCounter()
 
     // 统计变量
     let bytesIn = 0
@@ -43,7 +45,7 @@ export async function forwardRequest(req, res, targetUrl, managers, options = {}
     let totalTokens = 0
     let firstChunkSent = false
 
-    const { dbManager, wsManager } = managers
+    const { dbManager, wsManager, callback } = managers
 
     // 准备请求选项
     const url = new URL(targetUrl)
@@ -73,6 +75,8 @@ export async function forwardRequest(req, res, targetUrl, managers, options = {}
             const firstResponseTime = Date.now() - startTime
             console.log(`[Gateway] 首字节响应: ${firstResponseTime}ms - ${req.method} ${req.url}`)
             firstChunkSent = true
+            callback.first(bytesIn)
+            callback.promptByteLen(bytesIn)
         }
 
         // 发送响应头给客户端
@@ -88,28 +92,30 @@ export async function forwardRequest(req, res, targetUrl, managers, options = {}
             targetRes.on('data', (chunk) => {
                 // 统计响应字节数
                 bytesOut += chunk.length
+                callback.completionByteLen(bytesOut)
 
                 // 尝试解析 Token 信息
-                const parsed = tokenParser.processChunk(chunk)
-                if (parsed && !promptTokens && !completionTokens) {
-                    promptTokens = parsed.promptTokens
-                    completionTokens = parsed.completionTokens
-                    totalTokens = parsed.totalTokens
-                }
+                // A. 调用解析器：将原始字节转为结构化数组
+                // 返回格式如截图: [{ type: 'reasoning', text: '...' }, ...]
+                const segments = tokenParser.processChunk(chunk)
 
+                // B. 调用统计器：处理提取出的内容
+                if (segments && segments.length > 0) {
+                    for (const segment of segments) {
+                        // 【关键步骤】在这里调用外部统计逻辑
+                        // 你可以根据 type 决定是统计思考过程还是正式回答
+                        if (segment.text) {
+                            tokenCounter.add(segment.text, segment.type)
+                        }
+                    }
+                }
                 // 转发给客户端（直接转发原始数据，不修改）
                 res.write(chunk)
             })
 
             targetRes.on('end', () => {
                 // 处理剩余缓冲区
-                const flushToken = tokenParser.flush()
-                if (flushToken && !promptTokens) {
-                    promptTokens = flushToken.promptTokens
-                    completionTokens = flushToken.completionTokens
-                    totalTokens = flushToken.totalTokens
-                }
-
+                tokenParser.flush()
                 // 结束响应
                 res.end()
 
@@ -177,6 +183,16 @@ export async function forwardRequest(req, res, targetUrl, managers, options = {}
     // 统计请求字节数并转发请求体
     req.on('data', (chunk) => {
         bytesIn += chunk.length
+        const segments = tokenParser.processChunk(chunk)
+        if (segments && segments.length > 0) {
+            for (const segment of segments) {
+                // 【关键步骤】在这里调用外部统计逻辑
+                // 你可以根据 type 决定是统计思考过程还是正式回答
+                if (segment.text) {
+                    tokenCounter.add(segment.text, segment.type)
+                }
+            }
+        }
     })
 
     req.pipe(targetReq, { end: true })
@@ -194,7 +210,7 @@ export async function forwardRequest(req, res, targetUrl, managers, options = {}
         const statTime = new Date().toISOString().slice(0, 16).replace('T', ' ')
 
         // 异步写入数据库（不阻塞响应）
-        await dbManager.writeStats({
+        dbManager.writeStats({
             statTime,
             promptTokens,
             completionTokens,
@@ -214,6 +230,17 @@ export async function forwardRequest(req, res, targetUrl, managers, options = {}
             isSuccess,
             responseTime: Date.now() - startTime,
         })
+
+        // 清空之前统计字节
+        // if(!isSuccess){
+        //     bytesIn = 0
+        //     tokenCounter.resetValue('prompt', 0)
+        // }
+
+        // { prompt: 0, completion: 0, reasoning: 1385, total: 1385 }
+        const finalStats = tokenCounter.getFinalStats()
+        callback.completeTokens(finalStats)
+        callback.complete()
     }
 }
 
