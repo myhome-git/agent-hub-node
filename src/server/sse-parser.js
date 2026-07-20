@@ -25,7 +25,7 @@ export class SSETokenParser {
         this.buffer = lines.pop() || '' // 保留未完成的行
 
         const extractedItems = [] // 【关键】在当前批次内初始化一个扁平数组
-        console.log(lines)
+        // console.log(lines)
         for (const line of lines) {
             if (!line.trim() || line.startsWith(':')) continue
             if (line.includes('[DONE]')) {

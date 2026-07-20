@@ -90,7 +90,57 @@ export async function initGateway(options = {}) {
 
     // ==================== HTTP 服务器 ====================
 
+    // 使用 Map + 锁机制避免并发覆盖（生产环境建议用 LRU 缓存库如 `lru-cache`）
+    const requestTimestamps = new Map()
+    const mapLock = new Map() // 每个 Token 独立锁
+
+    function acquireLock(token) {
+        if (!mapLock.has(token)){
+            mapLock.set(token, { locked: false })
+        }
+        const lock = mapLock.get(token)
+        while (lock.locked) { /* 自旋等待 */ }
+        lock.locked = true
+        return () => { lock.locked = false }
+    }
+
     const server = http.createServer(async(req, res) => {
+        // 无凭证，跳过检查
+        const authHeader = req.headers['authorization']
+        if (!authHeader){
+            return next()
+        }
+
+        const token = authHeader.replace(/^Bearer\s+/i, '').trim()
+        if (!token){
+            return next()
+        }
+
+        // 2. 获取当前时间戳
+        const now = Date.now()
+
+        // 3. 加锁检查 & 更新时间戳
+        const release = acquireLock(token)
+        try {
+            const lastTime = requestTimestamps.get(token)
+
+            // 拦截条件：存在历史记录且间隔 < 200ms
+            if (lastTime && (now - lastTime) < 500) {
+                release()
+                res.writeHead(500, { 'Content-Type': 'application/json' })
+                res.end(JSON.stringify({
+                    error: 'Internal Server Error',
+                    message: 'Request too frequent',
+                }))
+                return
+            }
+
+            // 更新时间戳（放行前记录）
+            requestTimestamps.set(token, now)
+        } finally {
+            release() // 确保释放锁
+        }
+
         // 解析 URL
         const url = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`)
         const pathname = url.pathname

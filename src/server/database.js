@@ -3,7 +3,7 @@
  * 使用 sql.js（纯 JavaScript SQLite 实现，无需编译 native 代码）
  * 负责数据库自动初始化、按分钟统计写入、定时清理
  */
-
+import initSqlJs from 'sql.js'
 import { dirname, join } from 'path'
 import { fileURLToPath } from 'url'
 import fs from 'fs'
