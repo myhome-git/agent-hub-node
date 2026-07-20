@@ -1,10 +1,17 @@
 /**
  * 整个项目入口文件
- * 使用 nodemon 启动 Gateway 服务（自动重启）
- * nodemon 会监听 src/server/**
+ * 使用 spawn 启动两个子进程：
+ * 1. bun dev       - Vite 开发服务器 (端口 3000)
+ * 2. node src/server/index.js - Gateway 服务 (端口 9000/9001)
  */
 
 import { spawn } from 'child_process'
+import { fileURLToPath } from 'url'
+import { dirname, join } from 'path'
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = dirname(__filename)
+
 /**
  * 创建子进程并包装输出
  * @param {string} command - 命令
@@ -16,10 +23,11 @@ function createProcess(command, args, name) {
     const commandStr = `${command} ${args.join(' ')}`
     console.log(`[Manager] 启动 ${name}: ${commandStr}`)
 
-    const child = spawn(command, args, {
+    const child = spawn(commandStr, {
         stdio: 'inherit', // 继承标准输入/输出
         env: { ...process.env }, // 继承环境变量
         cwd: process.cwd(), // 使用当前工作目录
+        shell: true, // 使用 shell 以兼容 Windows
     })
 
     // 监听进程退出
@@ -76,9 +84,14 @@ function main() {
 
     const processes = new Map()
 
+    // ==================== 启动 Vite 开发服务器 ====================
+    // 使用 node + npm 启动，兼容 Windows
+    const viteProcess = createProcess('npm', ['run', 'dev'], 'Vite (前端开发服务器)')
+    processes.set('Vite', viteProcess)
+
     // ==================== 启动 Gateway 服务 ====================
-    // 使用 nodemon 启动 Gateway 服务（通过 npm run dev 启动 nodemon）
-    const gatewayProcess = createProcess('npm', ['run', 'dev'], 'Gateway (后端服务)')
+    const gatewayPath = join(__dirname, 'server', 'index.js')
+    const gatewayProcess = createProcess('node', [gatewayPath], 'Gateway (后端服务)')
     processes.set('Gateway', gatewayProcess)
 
     // ==================== 监听子进程信号 ====================
