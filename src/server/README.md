@@ -33,9 +33,9 @@
 
 ## 🛠️ 技术与输出要求
 
-- **技术栈**：Node.js 原生 `http` 模块 + `ws` 库 + 原生 JavaScript（不使用 TypeScript）+ SQLite（推荐使用 `better-sqlite3`）。
+- **技术栈**：Node.js 原生 `http` 模块 + `ws` 库 + 原生 JavaScript（不使用 TypeScript）+ SQLite。
 - **输出要求**：
-  1. 给出基于原生 `http` 的核心转发逻辑代码实现（重点展示字节流转发和流式 Token 解析部分）。
+  1. 文件后缀名`.sqlite`，数据名为`db.sqlite`，给出基于原生 `http` 的核心转发逻辑代码实现（重点展示字节流转发和流式 Token 解析部分）。
   2. 给出 SQLite 数据库的自动初始化逻辑（建库、建表）与按分钟统计的异步写入（Upsert）逻辑。
   3. 给出定时清理过期数据的实现逻辑。
   4. 给出 WebSocket 服务的初始化及消息广播逻辑。
