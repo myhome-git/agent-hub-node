@@ -5,8 +5,8 @@
 
 export class SSETokenParser {
     constructor() {
-        this.buffer = '';
-        this.foundUsage = false;
+        this.buffer = ''
+        this.foundUsage = false
     }
 
     /**
@@ -16,56 +16,57 @@ export class SSETokenParser {
      */
     processChunk(chunk) {
         // 将字节转换为字符串
-        this.buffer += new TextDecoder('utf-8').decode(chunk, { stream: true });
+        this.buffer += new TextDecoder('utf-8').decode(chunk, { stream: true })
 
         // 按行分割处理
-        const lines = this.buffer.split('\n');
+        const lines = this.buffer.split('\n')
         // 保留最后一个可能不完整的行到缓冲区
-        this.buffer = lines.pop() || '';
+        this.buffer = lines.pop() || ''
 
-        let tokenInfo = null;
+        let tokenInfo = null
 
         for (const line of lines) {
             // 跳过空行和注释行
             if (!line || line.startsWith(':')) {
-                continue;
+                continue
             }
 
             // 处理 SSE 数据行
             if (line.startsWith('data: ')) {
-                const data = line.substring(6).trim();
+                const data = line.substring(6).trim()
 
                 // SSE 结束标记
                 if (data === '[DONE]') {
-                    this.foundUsage = true;
-                    continue;
+                    this.foundUsage = true
+                    continue
                 }
 
                 // 尝试解析 JSON
                 try {
-                    const json = JSON.parse(data);
+                    const json = JSON.parse(data)
 
                     // 检查是否包含 usage 字段
                     if (json.usage && !this.foundUsage) {
-                        const { prompt_tokens, completion_tokens, total_tokens } = json.usage;
+                        const { prompt_tokens, completion_tokens, total_tokens } = json.usage
 
                         if (prompt_tokens !== undefined || completion_tokens !== undefined) {
                             tokenInfo = {
                                 promptTokens: prompt_tokens || 0,
                                 completionTokens: completion_tokens || 0,
                                 totalTokens: total_tokens || (prompt_tokens || 0) + (completion_tokens || 0),
-                            };
+                            }
 
-                            this.foundUsage = true;
+                            this.foundUsage = true
                         }
                     }
+                // eslint-disable-next-line no-unused-vars
                 } catch (e) {
                     // JSON 解析失败，忽略
                 }
             }
         }
 
-        return tokenInfo;
+        return tokenInfo
     }
 
     /**
@@ -74,18 +75,18 @@ export class SSETokenParser {
      */
     flush() {
         if (this.buffer.trim()) {
-            return this.processChunk(new TextEncoder().encode(this.buffer));
+            return this.processChunk(new TextEncoder().encode(this.buffer))
         }
-        return null;
+        return null
     }
 
     /**
      * 重置解析器状态
      */
     reset() {
-        this.buffer = '';
-        this.foundUsage = false;
+        this.buffer = ''
+        this.foundUsage = false
     }
 }
 
-export default SSETokenParser;
+export default SSETokenParser

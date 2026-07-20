@@ -2,7 +2,7 @@ import { Hono } from 'hono'
 import ClassDBConnection from '@/utils/db/ClassDBConnection'
 import { getType, isValidValue, md5 } from '@/utils/utils'
 import dayjs from 'dayjs'
-import tableConf from '@/table/admin'
+import tableConf from './config'
 const { uuidName, tableName, tableColumns } = tableConf
 
 const app = new Hono()
