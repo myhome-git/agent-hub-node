@@ -7,7 +7,7 @@ export function useSession(app) {
         store,
         // 加密密钥，用于加密存储在Cookie中的会话数据
         // 对于CookieStore是必需的，其他存储方式推荐使用
-        encryptionKey: process.env.SESSION_ENCRYPTION_KEY || crypto.randomUUID(), // Required for CookieStore, recommended for others.
+        encryptionKey: crypto.randomUUID(), // Required for CookieStore, recommended for others.
         // 会话过期时间（秒），此处设置为15分钟无活动后过期
         expireAfterSeconds: 900, // Expire session after 15 minutes of inactivity
         // 自动延长过期时间，当用户活跃时自动更新会话有效期

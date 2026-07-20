@@ -40,11 +40,9 @@ export default async function useGateway(app) {
 
   // 错误处理
   app.onError((error) => {
-    if(`${process.env.CONSOLE_ERROR}` === 'true'){
-        console.error(error)
-    }
+    console.error(error)
     return new Response(JSON.stringify({
-        message: `${process.env.CONSOLE_ERROR}` === 'true' ? error.message : 'Server Error'
+        message: 'Server Error'
     }), {
       status: 500,
       headers: responseHeader

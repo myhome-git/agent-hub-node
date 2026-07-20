@@ -141,7 +141,7 @@ export function initGateway(options = {}) {
     // ==================== 优雅关闭 ====================
 
     function gracefulShutdown() {
-        console.log('\n[Gateway] 收到关闭信号，正在关闭服务...')
+        console.log('[Gateway] 收到关闭信号，正在关闭服务...')
         server.close()
         wsManager.close()
         dbManager.close()

@@ -52,7 +52,7 @@ function createProcess(command, args, name) {
  * @param {Map<string, ChildProcess>} processes - 进程映射
  */
 function gracefulShutdown(processes) {
-    console.log('\n[Manager] 收到关闭信号，正在关闭所有服务...')
+    console.log('[Manager] 收到关闭信号，正在关闭所有服务...')
 
     for (const [name, child] of processes.entries()) {
         if (!child.killed) {
