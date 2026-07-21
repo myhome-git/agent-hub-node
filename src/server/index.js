@@ -65,10 +65,6 @@ export async function initGateway(options = {}) {
         dbManager,
         wsManager,
         callback: {
-            first: async() => {
-                // 首次相应，统计发送数据
-                console.log('first')
-            },
             promptByteLen: (len) => {
                 netDataCount.bytesIn += len
             },
@@ -220,20 +216,25 @@ export async function initGateway(options = {}) {
 
     server.listen(port, host, () => {
         // 获取统计数据
-        const stats = dbManager.getStats()
-        const summary = stats.summary
-        const totalPromptTokens = summary.total_prompt_tokens || 0
-        const totalCompletionTokens = summary.total_completion_tokens || 0
-        const totalTokens = summary.total_all_tokens || 0
-        const totalBytes = (summary.total_bytes_in || 0) + (summary.total_bytes_out || 0)
-        const totalMB = (totalBytes / 1024 / 1024).toFixed(2)
+        // const stats = dbManager.getStats()
+        // const summary = stats.summary
+        // const totalPromptTokens = summary.total_prompt_tokens || 0
+        // const totalCompletionTokens = summary.total_completion_tokens || 0
+        // const totalTokens = summary.total_all_tokens || 0
+        // const totalBytes = (summary.total_bytes_in || 0) + (summary.total_bytes_out || 0)
+        // const totalMB = (totalBytes / 1024 / 1024).toFixed(2)
 
         console.log('[Gateway] HTTP 转发网关已启动')
         console.log(`[Gateway] 监听地址: http://${host}:${port}`)
         console.log(`[Gateway] 目标服务: ${CONFIG.targetBaseUrl}`)
         console.log(`[Gateway] WebSocket 监控: ws://${host}:${CONFIG.wsPort}`)
         console.log(`[Gateway] 数据库路径: ${CONFIG.dbPath}`)
-        console.log(`[Gateway] 输入Token：${totalPromptTokens.toLocaleString()}，输出Token：${totalCompletionTokens.toLocaleString()}，累计总Token：${totalTokens.toLocaleString()}，累计数据大小：${totalMB} MB`)
+        // console.log(`[Gateway]
+        //     输入Token：${netDataCount.promptTokens}，
+        //     输出Token：${netDataCount.completionTokens}，
+        //     累计总Token：${netDataCount.totalTokens}，
+        //     累计数据大小：${totalMB} MB
+        // `)
     })
 
     // ==================== 优雅关闭 ====================

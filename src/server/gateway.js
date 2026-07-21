@@ -25,6 +25,7 @@ import CONFIG from './config.js'
  * @param {Object} options - 转发选项
  */
 export async function forwardRequest(req, res, targetUrl, managers, options = {}) {
+    console.log('[Gateway] init')
     const {
         headers = {},
         timeout = CONFIG.requestTimeout,
@@ -48,24 +49,35 @@ export async function forwardRequest(req, res, targetUrl, managers, options = {}
 
     // 准备请求选项
     const url = new URL(targetUrl)
+    // 1. 定义允许转发的 Header 白名单
+    const ALLOWED_HEADERS = [
+        'content-type',
+        // 'content-length',
+        'connection',
+        'authorization',
+        'user-agent', // 可选，有时用于后端日志
+        'x-request-id', // 如果有透传请求ID的需求
+        'api-key', // 某些自定义鉴权
+    ]
+
+    ALLOWED_HEADERS.forEach(key => {
+        if (req.headers[key]) {
+            headers[key] = req.headers[key]
+        }
+    })
+
+    // 3. 强制覆盖关键 Header
+    headers['host'] = url.host // 必须指向目标服务器
+    headers['connection'] = 'close' // 防止 Keep-Alive 导致的挂起
+    headers['accept-encoding'] = 'identity' // 【关键】禁止压缩，防止网关收到乱码
+
     const requestOptions = {
         hostname: url.hostname,
         port: url.port || (url.protocol === 'https:' ? 443 : 80),
         path: url.pathname + url.search,
         method: req.method,
-        headers: { ...req.headers },
+        headers
     }
-
-    // 移除不影响转发的头
-    delete requestOptions.headers['host']
-    delete requestOptions.headers['connection']
-    delete requestOptions.headers['keep-alive']
-    delete requestOptions.headers['transfer-encoding'] // 防止分块传输冲突
-
-    // 添加额外请求头
-    Object.entries(headers).forEach(([key, value]) => {
-        requestOptions.headers[key] = value
-    })
 
     // 1. 定义状态锁（必须在所有回调之前定义）
     let isCompleted = false
@@ -74,22 +86,22 @@ export async function forwardRequest(req, res, targetUrl, managers, options = {}
     // 根据协议选择 http 或 https 模块
     const targetModule = url.protocol === 'https:' ? https : http
     const targetReq = targetModule.request(requestOptions, (targetRes) => {
+        console.log('targetRes 事件触发')
         // 首次响应处理
-        if (!firstChunkSent) {
+        if (!firstChunkSent && !res.headersSent) {
             const firstResponseTime = Date.now() - startTime
-            console.log(`[Gateway] 首字节响应: ${firstResponseTime}ms - ${req.method} ${req.url}`)
+            console.log(`[Gateway] 首字节响应: ${firstResponseTime}ms`)
             firstChunkSent = true
-            callback.first(bytesIn)
-            callback.promptByteLen(bytesIn)
-        }
 
-        // 发送响应头
-        try {
-            res.writeHead(targetRes.statusCode, targetRes.headers)
-        } catch (e) {
-            console.error('[Gateway] 写入响应头失败:', e.message)
-            targetRes.destroy()
-            return
+            // 发送响应头
+            try {
+                res.writeHead(targetRes.statusCode, targetRes.headers)
+            } catch (e) {
+                // 如果写入响应头失败（例如客户端已断开），立即终止上游请求
+                console.error('[Gateway] 写入响应头失败:', e.message)
+                targetRes.destroy()
+                return
+            }
         }
 
         // 检查是否是流式响应
@@ -99,6 +111,7 @@ export async function forwardRequest(req, res, targetUrl, managers, options = {}
         if (isStream && targetRes.readable) {
             // ========== 流式响应处理 ==========
             targetRes.on('data', (chunk) => {
+                console.log('targetRes data 事件触发')
                 // 统计响应字节数
                 bytesOut += chunk.length
                 callback.completionByteLen(bytesOut)
@@ -126,10 +139,11 @@ export async function forwardRequest(req, res, targetUrl, managers, options = {}
             targetRes.on('data', (chunk) => { bytesOut += chunk.length })
 
             // 手动控制 end
-            targetRes.pipe(res, { end: false })
+            // targetRes.pipe(res, { end: false })
         }
 
         targetRes.on('end', () => {
+            console.error('[Gateway] 远程服务器Resp end:')
             // 处理剩余缓冲区
             tokenParser.flush()
 
@@ -148,14 +162,12 @@ export async function forwardRequest(req, res, targetUrl, managers, options = {}
         })
     })
 
-    // 不推荐处理targetReq.end事件
-    // targetReq.on('end', () => {})
-
     // 处理远程服务器请求错误
     targetReq.on('error', (error) => {
+        console.error('[Gateway] 远程服务器Req错误:', error.message)
+        // console.log(targetReq)
         // 防御性判断：如果是主动销毁引起的错误，忽略
         if (req.destroyed || isCompleted) return
-        console.error('[Gateway] 远程服务器Req错误:', error.message)
 
         try {
             // 必须同时满足：未发送首字节、未发送响应头、响应流仍可写
@@ -206,9 +218,13 @@ export async function forwardRequest(req, res, targetUrl, managers, options = {}
     })
 
     req.on('end', () => {
+        console.log('[Gateway] req end 事件触发')
+        // 拼接完整的请求体
+        const fullBody = Buffer.concat(reqBodyBuffer)
+
         // 在请求体接收完毕后，统一解析 JSON 计算 Prompt Tokens
         try {
-            const bodyStr = Buffer.concat(reqBodyBuffer).toString('utf-8')
+            const bodyStr = fullBody.toString('utf-8')
             const bodyJson = JSON.parse(bodyStr)
 
             // 【核心修复】：从 JSON 中提取 messages 进行统计
@@ -221,12 +237,17 @@ export async function forwardRequest(req, res, targetUrl, managers, options = {}
         } catch (e) {
             // 非 JSON 请求或解析失败，忽略
         }
+
+        // 此时 Node.js 会自动使用 Content-Length，而不会使用 Transfer-Encoding: chunked
+        if (!targetReq.destroyed) {
+            // targetReq.setHeader('Content-Length', fullBody.length) // 显式设置长度
+            targetReq.end(fullBody) // 一次性发送完整数据
+        }
     })
 
     req.on('close', () => {
-        if (isCompleted) return
-
         console.log(`[Gateway] 客户端连接关闭: ${req.url}`)
+        if (isCompleted) return
 
         // 销毁上游
         if (targetReq && !targetReq.destroyed) targetReq.destroy()
@@ -237,20 +258,16 @@ export async function forwardRequest(req, res, targetUrl, managers, options = {}
         completeRequest(false)
     })
 
-    req.on('error', (error) => {
-        if (isCompleted) return
+    req.on('error', (err) => {
+        console.error('[Gateway] 客户端连接错误:', err.message)
 
-        // 如果是客户端主动断开导致的错误，可以忽略或仅打印 debug 日志
-        if (error.code === 'ECONNRESET') {
-            // 客户端主动断开通常不需要报错，交给 close 处理即可
-            return
+        // 客户端出错，立即切断上游，防止资源浪费
+        if (!targetReq.destroyed) {
+            targetReq.destroy()
         }
 
-        console.error('[Gateway] 客户端请求错误:', error.message)
-        completeRequest(false)
+        if (['ECONNRESET', 'EPIPE'].includes(err.code)) return
     })
-
-    req.pipe(targetReq, { end: true })
 
     /**
      * 请求完成处理

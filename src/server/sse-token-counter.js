@@ -20,12 +20,17 @@ export class TokenCounter {
         try {
             // 计算当前片段的 token 数
             const tokens = this.encoder.encode(text).length
-
-            if (type === 'reasoning') {
-                this.reasoningTokens += tokens
-            } else {
-                // 默认为 content
-                this.completionTokens += tokens
+            switch (type) {
+                case 'prompt':
+                    this.promptTokens += tokens
+                    break
+                case 'reasoning':
+                    this.reasoningTokens += tokens
+                    break
+                default:
+                    // 默认为 content
+                    this.completionTokens += tokens
+                    break
             }
         } catch (e) {
             console.error('Token 计算出错:', e)
