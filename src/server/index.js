@@ -76,15 +76,12 @@ export async function initGateway(options = {}) {
                 netDataCount.completionTokens += completion
                 netDataCount.reasoningTokens += reasoning
                 netDataCount.totalTokens += total
-            },
-            complete: () => {
-                console.log('complete')
             }
         }
     }
 
     // ==================== HTTP 服务器 ====================
-
+    const clientReqMap = new Map()
     const server = http.createServer(async(req, res) => {
         // 【新增】处理 OPTIONS 预检请求 (CORS 必需，否则 Chatbox 会报 Network Error)
         if (req.method === 'OPTIONS') {
@@ -93,6 +90,39 @@ export async function initGateway(options = {}) {
             res.end()
             return
         }
+
+        // 获得请求指纹
+        const remoteAddress = req.socket.remoteAddress
+        const headers = req.headers
+        const userAgent = headers['user-agent']
+        const authorization = headers['authorization']
+        const clientId = `${remoteAddress}${userAgent}${authorization}`
+        const currentTime = Date.now()
+        const lastTime = clientReqMap.get(clientId)
+
+        // 300ms 内的重复请求拦截
+        if (lastTime && (currentTime - lastTime < 300)) {
+            console.log(`[Gateway] 拦截高频重复请求: ${clientId}`)
+
+            // 1. 使用标准的 429 状态码
+            res.writeHead(429, { 'Content-Type': 'application/json', ...CORS_HEADERS })
+            return res.end(JSON.stringify({
+                error: 'Rate limit exceeded',
+                message: 'Too many requests, please try again later.'
+            }))
+        }
+
+        // 2. 记录当前请求时间
+        clientReqMap.set(clientId, currentTime)
+
+        // 3. 【关键】设置过期清理，防止内存泄漏
+        // 如果 1秒 内该客户端没有新请求，自动从 Map 中删除
+        setTimeout(() => {
+            // 只有当 Map 中记录的时间依然是当前时间时，才删除（防止误删新请求）
+            if (clientReqMap.get(clientId) === currentTime) {
+                clientReqMap.delete(clientId)
+            }
+        }, 1000)
 
         // 【新增】禁用 Nagle 算法，确保流式数据立即发送，降低 Chatbox 首字和流式卡顿延迟
         if (req.socket) {

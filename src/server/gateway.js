@@ -101,8 +101,9 @@ export async function forwardRequest(req, res, targetUrl, managers, options = {}
 
     // 根据协议选择 http 或 https 模块
     const targetModule = url.protocol === 'https:' ? https : http
+    let targetResControl = null
     const targetReq = targetModule.request(requestOptions, (targetRes) => {
-
+        targetResControl = targetRes
         // 【优化】提前判断是否为流式响应，以便在发送 Header 前清理冲突字段
         const contentType = targetRes.headers['content-type'] || ''
         const isStream = contentType.includes('text/event-stream') || contentType.includes('application/octet-stream')
@@ -249,8 +250,12 @@ export async function forwardRequest(req, res, targetUrl, managers, options = {}
         }
     })
 
+    req.on('close', () => {
+        console.log(`[Gateway] 客户端req close: ${req.url}`)
+    })
+
     req.on('error', () => {
-        // console.log(`[Gateway] 客户端req error: ${err.message}`)
+        console.log(`[Gateway] 客户端req error: ${err.message}`)
         if (isCompleted) return
         if (targetReq && !targetReq.destroyed) targetReq.destroy()
         if (!res.writableEnded) res.end()
@@ -259,15 +264,16 @@ export async function forwardRequest(req, res, targetUrl, managers, options = {}
 
     // response对象
     res.on('close', () => {
-        // console.log(`[Gateway] 客户端resp close: ${req.url}`)
+        console.log(`[Gateway] 客户端resp close: ${req.url}`)
         if (isCompleted) return
         if (targetReq && !targetReq.destroyed) targetReq.destroy()
+        if (targetResControl && !targetResControl.destroyed) targetResControl.destroy()
         if (!res.writableEnded) res.end()
         completeRequest(false)
     })
 
     res.on('error', () => {
-        // console.error('[Gateway] 客户端resp error:', err.message)
+        console.error('[Gateway] 客户端resp error:', err.message)
         if (targetReq && !targetReq.destroyed) targetReq.destroy()
         if (!res.writableEnded) res.end()
     })
@@ -280,7 +286,7 @@ export async function forwardRequest(req, res, targetUrl, managers, options = {}
         isCompleted = true
         console.log(`[Gateway] 请求结束，状态: ${isSuccess ? '成功' : '失败'}`)
         const finalStats = tokenCounter.getFinalStats()
-
+        callback.completeTokens(finalStats)
         dbManager.writeStats({
             'api_key_uuid': apiKey,
             'start_time': startTime,
@@ -293,9 +299,6 @@ export async function forwardRequest(req, res, targetUrl, managers, options = {}
             'bytes_out': bytesOut,
             'is_success': isSuccess ? 1 : 0
         })
-
-        callback.completeTokens(finalStats)
-        callback.complete()
     }
 }
 
