@@ -21,7 +21,7 @@ const CORS_HEADERS = {
  * 高性能字节流转发函数
  */
 export async function forwardRequest(req, res, targetUrl, managers, options = {}) {
-    console.log('[Gateway] init')
+    // console.log('[Gateway] init')
 
     // 无凭证，跳过检查
     const authHeader = req.headers['authorization']
@@ -57,7 +57,7 @@ export async function forwardRequest(req, res, targetUrl, managers, options = {}
     let completionTokens = 0
     let totalTokens = 0
 
-    const { dbManager, wsManager, callback } = managers
+    const { dbManager, callback } = managers
 
     // 准备请求选项
     const url = new URL(targetUrl)
@@ -70,7 +70,8 @@ export async function forwardRequest(req, res, targetUrl, managers, options = {}
         'authorization',
         'user-agent',
         'x-request-id',
-        'accept-encoding'
+        'accept-encoding',
+        'x-api-key'
     ]
 
     ALLOWED_HEADERS.forEach(key => {
@@ -111,6 +112,7 @@ export async function forwardRequest(req, res, targetUrl, managers, options = {}
             const firstResponseTime = Date.now() - startTime
             console.log(`[Gateway] 首字节响应: ${firstResponseTime}ms`)
             firstChunkSent = true
+            callback.promptByteLen(bytesIn)
 
             // 【优化】清理并合并 Header
             const cleanHeaders = { ...targetRes.headers }
@@ -165,24 +167,24 @@ export async function forwardRequest(req, res, targetUrl, managers, options = {}
         }
 
         targetRes.on('end', () => {
-            console.log('[Gateway] 远程服务器resp end')
+            // console.log('[Gateway] 远程服务器resp end')
             tokenParser.flush()
             if (!res.writableEnded) res.end()
         })
 
-        targetRes.on('error', (error) => {
-            console.error('[Gateway] 远程服务器resp error', error.message)
+        targetRes.on('error', () => {
+            // console.error('[Gateway] 远程服务器resp error', error.message)
             if (!res.writableEnded) res.end()
         })
     })
 
     targetReq.on('close', () => {
-        console.error('[Gateway] 远程服务器req close')
+        // console.error('[Gateway] 远程服务器req close')
     })
 
     // 处理远程服务器请求错误
     targetReq.on('error', (error) => {
-        console.error('[Gateway] 远程服务器req error', error.message)
+        // console.error('[Gateway] 远程服务器req error', error.message)
         if (res.destroyed || isCompleted) return
 
         try {
@@ -200,19 +202,24 @@ export async function forwardRequest(req, res, targetUrl, managers, options = {}
 
     // 设置超时
     targetReq.setTimeout(timeout, () => {
-        if (isCompleted) return
         console.warn(`[Gateway] 请求超时 (${timeout}ms): ${req.url}`)
-
+        if (isCompleted) return
         if (targetReq && !targetReq.destroyed) {
             targetReq.destroy()
         }
 
-        if (!firstChunkSent && !res.headersSent && !res.writableEnded) {
+        if (!res.headersSent && !res.writableEnded) {
             res.writeHead(504, { 'Content-Type': 'application/json', ...CORS_HEADERS })
-            res.end(JSON.stringify({ error: 'Gateway Timeout', message: '请求超时' }))
+            res.end(JSON.stringify({
+                error: 'Gateway Timeout',
+                message: `请求在 ${timeout}ms 内未得到响应`
+            }))
         } else if (!res.writableEnded) {
+            // 如果流式传输中途超时，只能强制结束连接
             res.end()
         }
+
+        // 4. 标记请求完成，清理资源
         completeRequest(false)
     })
 
@@ -225,9 +232,9 @@ export async function forwardRequest(req, res, targetUrl, managers, options = {}
     })
 
     req.on('end', () => {
-        console.log('[Gateway] 客户端req end')
+        // console.log('[Gateway] 客户端req end')
         const fullBody = Buffer.concat(reqBodyBuffer)
-        bytesIn += fullBody.length
+        bytesIn = fullBody.length
         try {
             const bodyStr = fullBody.toString('utf-8')
             const bodyJson = JSON.parse(bodyStr)
@@ -242,8 +249,8 @@ export async function forwardRequest(req, res, targetUrl, managers, options = {}
         }
     })
 
-    req.on('error', (err) => {
-        console.log(`[Gateway] 客户端req error: ${err.message}`)
+    req.on('error', () => {
+        // console.log(`[Gateway] 客户端req error: ${err.message}`)
         if (isCompleted) return
         if (targetReq && !targetReq.destroyed) targetReq.destroy()
         if (!res.writableEnded) res.end()
@@ -252,22 +259,15 @@ export async function forwardRequest(req, res, targetUrl, managers, options = {}
 
     // response对象
     res.on('close', () => {
-        console.log(`[Gateway] 客户端resp close: ${req.url}`)
+        // console.log(`[Gateway] 客户端resp close: ${req.url}`)
         if (isCompleted) return
         if (targetReq && !targetReq.destroyed) targetReq.destroy()
         if (!res.writableEnded) res.end()
         completeRequest(false)
     })
 
-    res.on('finish', () => {
-        console.log('[Gateway] 客户端resp finish')
-        if (isCompleted) return
-        if (!res.writableEnded) res.end()
-        completeRequest(true)
-    })
-
-    res.on('error', (err) => {
-        console.error('[Gateway] 客户端resp error:', err.message)
+    res.on('error', () => {
+        // console.error('[Gateway] 客户端resp error:', err.message)
         if (targetReq && !targetReq.destroyed) targetReq.destroy()
         if (!res.writableEnded) res.end()
     })
@@ -284,11 +284,6 @@ export async function forwardRequest(req, res, targetUrl, managers, options = {}
 
         dbManager.writeStats({
             statTime, promptTokens, completionTokens, totalTokens, bytesIn, bytesOut, isSuccess,
-        })
-
-        wsManager.broadcastStats({
-            promptTokens, completionTokens, totalTokens, bytesIn, bytesOut, isSuccess,
-            responseTime: Date.now() - startTime,
         })
 
         const finalStats = tokenCounter.getFinalStats()

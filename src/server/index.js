@@ -87,7 +87,7 @@ export async function initGateway(options = {}) {
                 netDataCount.totalTokens += total
             },
             complete: () => {
-                console.log('complete')
+                console.log('complete', netDataCount)
             }
         }
     }
@@ -103,7 +103,17 @@ export async function initGateway(options = {}) {
             return
         }
 
-        console.log('[index] server index')
+        // 在你的网关中提取 API Key
+        const authHeader = req.headers['authorization']
+        const anthropicKey = req.headers['x-api-key']
+
+        let apiKey = null
+        if (authHeader && authHeader.startsWith('Bearer ')) {
+            apiKey = authHeader.split(' ')[1] // 提取 Bearer 后面的 Key
+        } else if (anthropicKey) {
+            apiKey = anthropicKey
+            console.log(apiKey)
+        }
 
         // 【新增】禁用 Nagle 算法，确保流式数据立即发送，降低 Chatbox 首字和流式卡顿延迟
         if (req.socket) {
@@ -185,25 +195,21 @@ export async function initGateway(options = {}) {
 
     server.listen(port, host, () => {
         // 获取统计数据
-        // const stats = dbManager.getStats()
-        // const summary = stats.summary
-        // const totalPromptTokens = summary.total_prompt_tokens || 0
-        // const totalCompletionTokens = summary.total_completion_tokens || 0
-        // const totalTokens = summary.total_all_tokens || 0
-        // const totalBytes = (summary.total_bytes_in || 0) + (summary.total_bytes_out || 0)
-        // const totalMB = (totalBytes / 1024 / 1024).toFixed(2)
+        const stats = dbManager.getStats()
+        const summary = stats.summary
+        const totalPromptTokens = summary.total_prompt_tokens || 0
+        const totalCompletionTokens = summary.total_completion_tokens || 0
+        const totalTokens = summary.total_all_tokens || 0
+        const totalBytes = (summary.total_bytes_in || 0) + (summary.total_bytes_out || 0)
+        const totalMB = (totalBytes / 1024 / 1024).toFixed(2)
 
         console.log('[Gateway] HTTP 转发网关已启动')
         console.log(`[Gateway] 监听地址: http://${host}:${port}`)
         console.log(`[Gateway] 目标服务: ${CONFIG.targetBaseUrl}`)
         console.log(`[Gateway] WebSocket 监控: ws://${host}:${CONFIG.wsPort}`)
         console.log(`[Gateway] 数据库路径: ${CONFIG.dbPath}`)
-        // console.log(`[Gateway]
-        //     输入Token：${netDataCount.promptTokens}，
-        //     输出Token：${netDataCount.completionTokens}，
-        //     累计总Token：${netDataCount.totalTokens}，
-        //     累计数据大小：${totalMB} MB
-        // `)
+        console.log(`[Gateway] 累计数据（Token）,输入:${totalPromptTokens}，输出：${totalCompletionTokens}，累计总：${totalTokens}，累计数据大小：${totalMB} MB
+        `)
     })
 
     // ==================== 优雅关闭 ====================
