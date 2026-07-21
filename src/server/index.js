@@ -102,14 +102,14 @@ export async function initGateway(options = {}) {
 
         // 300ms 内的重复请求拦截
         if (lastTime && (currentTime - lastTime < 300)) {
-            console.log(`[Gateway] 拦截高频重复请求: ${clientId}`)
-
+            console.log('[Gateway] 拦截高频重复请求')
             // 1. 使用标准的 429 状态码
             res.writeHead(429, { 'Content-Type': 'application/json', ...CORS_HEADERS })
-            return res.end(JSON.stringify({
+            res.end(JSON.stringify({
                 error: 'Rate limit exceeded',
                 message: 'Too many requests, please try again later.'
             }))
+            return
         }
 
         // 2. 记录当前请求时间
