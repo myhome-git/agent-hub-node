@@ -23,23 +23,26 @@ const CORS_HEADERS = {
 export async function forwardRequest(req, res, targetUrl, managers, options = {}) {
     // console.log('[Gateway] init')
 
-    // 无凭证，跳过检查
+    // 在你的网关中提取 API Key
     const authHeader = req.headers['authorization']
-    if (!authHeader){
+    const anthropicKey = req.headers['x-api-key']
+
+    let apiKey = null
+    if (authHeader) {
+        apiKey = authHeader.replace(/^Bearer\s+/i, '').trim()
+    } else if (anthropicKey) {
+        apiKey = anthropicKey
+    }
+
+    // 无凭证，跳过检查
+    if (!apiKey) {
         res.writeHead(500, { 'Content-Type': 'application/json', ...CORS_HEADERS })
         res.end(JSON.stringify({ error: 'Internal Server Error', message: 'authHeader' }))
         return
     }
 
-    const token = authHeader.replace(/^Bearer\s+/i, '').trim()
-    if (!token){
-        res.writeHead(500, { 'Content-Type': 'application/json', ...CORS_HEADERS })
-        res.end(JSON.stringify({ error: 'Internal Server Error', message: 'token' }))
-        return
-    }
-
     const {
-        headers = { },
+        headers = {},
         timeout = CONFIG.requestTimeout,
     } = options
 
@@ -53,9 +56,6 @@ export async function forwardRequest(req, res, targetUrl, managers, options = {}
     // 统计变量
     let bytesIn = 0
     let bytesOut = 0
-    let promptTokens = 0
-    let completionTokens = 0
-    let totalTokens = 0
 
     const { dbManager, callback } = managers
 
@@ -243,7 +243,7 @@ export async function forwardRequest(req, res, targetUrl, managers, options = {}
                 const promptText = bodyJson.messages.map(m => m.content).join('\n')
                 tokenCounter.add(promptText, 'prompt')
             }
-        // eslint-disable-next-line no-unused-vars
+            // eslint-disable-next-line no-unused-vars
         } catch (e) {
             // 非 JSON 请求或解析失败，忽略
         }
@@ -279,14 +279,21 @@ export async function forwardRequest(req, res, targetUrl, managers, options = {}
         if (isCompleted) return
         isCompleted = true
         console.log(`[Gateway] 请求结束，状态: ${isSuccess ? '成功' : '失败'}`)
-
-        const statTime = new Date().toISOString().slice(0, 16).replace('T', ' ')
+        const finalStats = tokenCounter.getFinalStats()
 
         dbManager.writeStats({
-            statTime, promptTokens, completionTokens, totalTokens, bytesIn, bytesOut, isSuccess,
+            'api_key_uuid': apiKey,
+            'start_time': startTime,
+            'end_time': Date.now(),
+            'prompt_tokens': finalStats.prompt,
+            'completion_tokens': finalStats.completion,
+            'reasoning_tokens': finalStats.reasoning,
+            'total_tokens': finalStats.total,
+            'bytes_in': bytesIn,
+            'bytes_out': bytesOut,
+            'is_success': isSuccess ? 1 : 0
         })
 
-        const finalStats = tokenCounter.getFinalStats()
         callback.completeTokens(finalStats)
         callback.complete()
     }

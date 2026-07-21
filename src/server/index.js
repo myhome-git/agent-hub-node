@@ -78,7 +78,7 @@ export async function initGateway(options = {}) {
                 netDataCount.totalTokens += total
             },
             complete: () => {
-                console.log('complete', netDataCount)
+                console.log('complete')
             }
         }
     }
@@ -92,18 +92,6 @@ export async function initGateway(options = {}) {
             res.writeHead(204, CORS_HEADERS)
             res.end()
             return
-        }
-
-        // 在你的网关中提取 API Key
-        const authHeader = req.headers['authorization']
-        const anthropicKey = req.headers['x-api-key']
-
-        let apiKey = null
-        if (authHeader && authHeader.startsWith('Bearer ')) {
-            apiKey = authHeader.split(' ')[1] // 提取 Bearer 后面的 Key
-        } else if (anthropicKey) {
-            apiKey = anthropicKey
-            console.log(apiKey)
         }
 
         // 【新增】禁用 Nagle 算法，确保流式数据立即发送，降低 Chatbox 首字和流式卡顿延迟
@@ -182,22 +170,23 @@ export async function initGateway(options = {}) {
 
     // ==================== 启动服务 ====================
 
-    server.listen(port, host, () => {
+    function formatMB(num){
+        return `${(num / 1024 / 1024).toFixed(2)} MB`
+    }
+
+    server.listen(port, host, async() => {
         // 获取统计数据
-        const stats = dbManager.getStats()
-        const summary = stats.summary
+        const stats = await dbManager.getStats()
+        const summary = stats.summary[0]
         const totalPromptTokens = summary.total_prompt_tokens || 0
         const totalCompletionTokens = summary.total_completion_tokens || 0
-        const totalTokens = summary.total_all_tokens || 0
-        const totalBytes = (summary.total_bytes_in || 0) + (summary.total_bytes_out || 0)
-        const totalMB = (totalBytes / 1024 / 1024).toFixed(2)
+        const totalReasoningTokens = summary.total_reasoning_tokens || 0
 
         console.log('[Gateway] HTTP 转发网关已启动')
         console.log(`[Gateway] 监听地址: http://${host}:${port}`)
         console.log(`[Gateway] 目标服务: ${CONFIG.targetBaseUrl}`)
         console.log(`[Gateway] 数据库路径: ${CONFIG.dbPath}`)
-        console.log(`[Gateway] 累计数据（Token）,输入:${totalPromptTokens}，输出：${totalCompletionTokens}，累计总：${totalTokens}，累计数据大小：${totalMB} MB
-        `)
+        console.log(`[Gateway] 累计数据（Token）,输入:${formatMB(totalPromptTokens)}，输出：${formatMB(totalCompletionTokens)}, 思考：${formatMB(totalReasoningTokens)}`)
     })
 
     // ==================== 优雅关闭 ====================
@@ -246,7 +235,7 @@ console.log(`
     █                                                                     █
     █           Aent Hub v1.0.0 • High-Performance API Gateway            █
     █           ────────────────────────────────────────────              █
-    █           • Uptime: ${now}                                          █
+    █           • Uptime: ${now}                         █
     █                                                                     █
     █           ▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄             █
     █           █ STATUS 200 • Ready for incoming traffic   █             █
