@@ -20,7 +20,7 @@ import CONFIG from './config.js'
  *
  * @param {http.IncomingMessage} req - 客户端请求
  * @param {http.ServerResponse} res - 客户端响应
- * @param {string} targetUrl - 目标 URL
+ * @param {string} targetUrl - 远程服务器 URL
  * @param {Object} managers - 管理器对象
  * @param {Object} options - 转发选项
  */
@@ -43,7 +43,6 @@ export async function forwardRequest(req, res, targetUrl, managers, options = {}
     let promptTokens = 0
     let completionTokens = 0
     let totalTokens = 0
-    let firstChunkSent = false
 
     const { dbManager, wsManager, callback } = managers
 
@@ -58,19 +57,24 @@ export async function forwardRequest(req, res, targetUrl, managers, options = {}
     }
 
     // 移除不影响转发的头
-    delete requestOptions.headers.host
-    delete requestOptions.headers.connection
+    delete requestOptions.headers['host']
+    delete requestOptions.headers['connection']
     delete requestOptions.headers['keep-alive']
+    delete requestOptions.headers['transfer-encoding'] // 防止分块传输冲突
 
     // 添加额外请求头
     Object.entries(headers).forEach(([key, value]) => {
         requestOptions.headers[key] = value
     })
 
+    // 1. 定义状态锁（必须在所有回调之前定义）
+    let isCompleted = false
+    let firstChunkSent = false
+
     // 根据协议选择 http 或 https 模块
     const targetModule = url.protocol === 'https:' ? https : http
     const targetReq = targetModule.request(requestOptions, (targetRes) => {
-        // 首次响应时发送响应头（记录首字节时间）
+        // 首次响应处理
         if (!firstChunkSent) {
             const firstResponseTime = Date.now() - startTime
             console.log(`[Gateway] 首字节响应: ${firstResponseTime}ms - ${req.method} ${req.url}`)
@@ -79,13 +83,18 @@ export async function forwardRequest(req, res, targetUrl, managers, options = {}
             callback.promptByteLen(bytesIn)
         }
 
-        // 发送响应头给客户端
-        res.writeHead(targetRes.statusCode, targetRes.headers)
+        // 发送响应头
+        try {
+            res.writeHead(targetRes.statusCode, targetRes.headers)
+        } catch (e) {
+            console.error('[Gateway] 写入响应头失败:', e.message)
+            targetRes.destroy()
+            return
+        }
 
         // 检查是否是流式响应
         const contentType = targetRes.headers['content-type'] || ''
-        const isStream = contentType.includes('text/event-stream') ||
-                         contentType.includes('application/json')
+        const isStream = contentType.includes('text/event-stream')
 
         if (isStream && targetRes.readable) {
             // ========== 流式响应处理 ==========
@@ -109,57 +118,57 @@ export async function forwardRequest(req, res, targetUrl, managers, options = {}
                         }
                     }
                 }
-                // 转发给客户端（直接转发原始数据，不修改）
-                res.write(chunk)
-            })
-
-            targetRes.on('end', () => {
-                // 处理剩余缓冲区
-                tokenParser.flush()
-                // 结束响应
-                res.end()
-
-                // 完成转发，写入统计
-                completeRequest(true)
-            })
-
-            targetRes.on('error', (error) => {
-                console.error('[Gateway] 目标响应错误:', error.message)
-                // 确保响应已结束
-                if (!res.writableEnded) {
-                    res.end()
-                }
-                completeRequest(false)
+                // 转发给客户端
+                if (!res.writableEnded) res.write(chunk)
             })
         } else {
             // ========== 普通响应处理 ==========
-            targetRes.pipe(res, { end: true })
+            targetRes.on('data', (chunk) => { bytesOut += chunk.length })
 
-            targetRes.on('data', (chunk) => {
-                bytesOut += chunk.length
-            })
-
-            targetRes.on('end', () => {
-                completeRequest(true)
-            })
-
-            targetRes.on('error', (error) => {
-                console.error('[Gateway] 目标响应错误:', error.message)
-                completeRequest(false)
-            })
+            // 手动控制 end
+            targetRes.pipe(res, { end: false })
         }
+
+        targetRes.on('end', () => {
+            // 处理剩余缓冲区
+            tokenParser.flush()
+
+            if (!res.writableEnded){
+                res.end()
+            }
+            completeRequest(true)
+        })
+
+        targetRes.on('error', (error) => {
+            console.error('[Gateway] 远程服务器Resp错误:', error.message)
+            if (!res.writableEnded){
+                res.end()
+            }
+            completeRequest(false)
+        })
     })
 
-    // 处理目标请求错误
-    targetReq.on('error', (error) => {
-        console.error('[Gateway] 目标请求错误:', error.message)
+    // 不推荐处理targetReq.end事件
+    // targetReq.on('end', () => {})
 
-        if (!firstChunkSent) {
-            res.writeHead(502, { 'Content-Type': 'application/json' })
-            res.end(JSON.stringify({
-                error: 'Gateway Error',
-                message: error.message,
-            }))
+    // 处理远程服务器请求错误
+    targetReq.on('error', (error) => {
+        // 防御性判断：如果是主动销毁引起的错误，忽略
+        if (req.destroyed || isCompleted) return
+        console.error('[Gateway] 远程服务器Req错误:', error.message)
+
+        try {
+            // 必须同时满足：未发送首字节、未发送响应头、响应流仍可写
+            if (!firstChunkSent && !res.headersSent && !res.writableEnded) {
+                res.writeHead(502, { 'Content-Type': 'application/json' })
+                res.end(JSON.stringify({ error: 'Gateway Error', message: error.message }))
+            } else if (!res.writableEnded) {
+                // 如果响应头已经发送（流式传输中途上游报错），只能优雅地切断连接
+                res.end()
+            }
+        } catch (e) {
+            // 捕获底层流异常，防止 Node.js 进程崩溃
+            console.error('[Gateway] 写入 502 响应时发生异常:', e.message)
         }
 
         completeRequest(false)
@@ -167,46 +176,91 @@ export async function forwardRequest(req, res, targetUrl, managers, options = {}
 
     // 设置超时
     targetReq.setTimeout(timeout, () => {
-        targetReq.destroy()
+        if (isCompleted) return
+        console.warn(`[Gateway] 请求超时 (${timeout}ms): ${req.url}`)
 
-        if (!firstChunkSent) {
+        if (targetReq && !targetReq.destroyed) {
+            targetReq.destroy()
+        }
+
+        if (!firstChunkSent && !res.headersSent && !res.writableEnded) {
             res.writeHead(504, { 'Content-Type': 'application/json' })
             res.end(JSON.stringify({
                 error: 'Gateway Timeout',
                 message: '请求超时',
             }))
+        } else if (!res.writableEnded) {
+            // 如果响应头已经发送（流式传输中途超时），只能优雅地结束连接
+            res.end()
         }
 
         completeRequest(false)
     })
 
-    // 统计请求字节数并转发请求体
+    // ========== 请求体处理与输入 Token 统计 ==========
+    let reqBodyBuffer = []
+
     req.on('data', (chunk) => {
         bytesIn += chunk.length
-        const segments = tokenParser.processChunk(chunk)
-        if (segments && segments.length > 0) {
-            for (const segment of segments) {
-                // 【关键步骤】在这里调用外部统计逻辑
-                // 你可以根据 type 决定是统计思考过程还是正式回答
-                if (segment.text) {
-                    tokenCounter.add(segment.text, segment.type)
-                }
+        reqBodyBuffer.push(chunk) // 缓存请求体用于后续解析
+    })
+
+    req.on('end', () => {
+        // 在请求体接收完毕后，统一解析 JSON 计算 Prompt Tokens
+        try {
+            const bodyStr = Buffer.concat(reqBodyBuffer).toString('utf-8')
+            const bodyJson = JSON.parse(bodyStr)
+
+            // 【核心修复】：从 JSON 中提取 messages 进行统计
+            if (bodyJson.messages && Array.isArray(bodyJson.messages)) {
+                const promptText = bodyJson.messages.map(m => m.content).join('\n')
+                // 假设你的 counter 支持直接添加文本
+                tokenCounter.add(promptText, 'prompt')
             }
+        // eslint-disable-next-line no-unused-vars
+        } catch (e) {
+            // 非 JSON 请求或解析失败，忽略
         }
     })
 
-    req.pipe(targetReq, { end: true })
+    req.on('close', () => {
+        if (isCompleted) return
+
+        console.log(`[Gateway] 客户端连接关闭: ${req.url}`)
+
+        // 销毁上游
+        if (targetReq && !targetReq.destroyed) targetReq.destroy()
+
+        // 结束下游
+        if (!res.writableEnded) res.end()
+
+        completeRequest(false)
+    })
 
     req.on('error', (error) => {
+        if (isCompleted) return
+
+        // 如果是客户端主动断开导致的错误，可以忽略或仅打印 debug 日志
+        if (error.code === 'ECONNRESET') {
+            // 客户端主动断开通常不需要报错，交给 close 处理即可
+            return
+        }
+
         console.error('[Gateway] 客户端请求错误:', error.message)
         completeRequest(false)
     })
+
+    req.pipe(targetReq, { end: true })
 
     /**
      * 请求完成处理
      * @param {boolean} isSuccess - 是否成功
      */
     async function completeRequest(isSuccess) {
+        if (isCompleted) return // 核心防重入
+        isCompleted = true
+        console.log(`[Gateway] 请求结束，状态: ${isSuccess ? '成功' : '失败'}`)
+
         const statTime = new Date().toISOString().slice(0, 16).replace('T', ' ')
 
         // 异步写入数据库（不阻塞响应）

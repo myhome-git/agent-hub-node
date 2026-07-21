@@ -83,7 +83,7 @@ export async function initGateway(options = {}) {
                 netDataCount.totalTokens += total
             },
             complete: () => {
-                console.log('complete', netDataCount)
+                console.log('complete')
             }
         }
     }
@@ -99,12 +99,13 @@ export async function initGateway(options = {}) {
             mapLock.set(token, { locked: false })
         }
         const lock = mapLock.get(token)
-        while (lock.locked) { /* 自旋等待 */ }
+        // while (lock.locked) { /* 自旋等待 */ }
         lock.locked = true
         return () => { lock.locked = false }
     }
 
     const server = http.createServer(async(req, res) => {
+        console.log('[index] server init')
         // 无凭证，跳过检查
         const authHeader = req.headers['authorization']
         if (!authHeader){
@@ -123,22 +124,25 @@ export async function initGateway(options = {}) {
         const release = acquireLock(token)
         try {
             const lastTime = requestTimestamps.get(token)
+            console.log(lastTime)
 
             // 拦截条件：存在历史记录且间隔 < 200ms
-            if (lastTime && (now - lastTime) < 500) {
-                release()
-                res.writeHead(500, { 'Content-Type': 'application/json' })
-                res.end(JSON.stringify({
-                    error: 'Internal Server Error',
-                    message: 'Request too frequent',
-                }))
-                return
-            }
+            // if (lastTime && (now - lastTime) < 500) {
+            //     release()
+            //     res.writeHead(500, { 'Content-Type': 'application/json' })
+            //     res.end(JSON.stringify({
+            //         error: 'Internal Server Error',
+            //         message: 'Request too frequent',
+            //     }))
+            //     return
+            // }
 
             // 更新时间戳（放行前记录）
             requestTimestamps.set(token, now)
         } finally {
-            release() // 确保释放锁
+            if(false){
+                release() // 确保释放锁
+            }
         }
 
         // 解析 URL
@@ -195,13 +199,12 @@ export async function initGateway(options = {}) {
 
         // 转发请求到目标服务
         const targetUrl = `${CONFIG.targetBaseUrl}${pathname}${url.search}`
-
-        console.log(`[Gateway] ${req.method} ${req.url} -> ${targetUrl}`)
+        console.log(`[index] ${req.method} ${req.url} -> ${targetUrl}`)
 
         try {
             await forwardRequest(req, res, targetUrl, managers)
         } catch (error) {
-            console.error('[Gateway] 转发失败:', error)
+            console.error('[index] 转发失败:', error)
 
             if (!res.headersSent) {
                 res.writeHead(500, { 'Content-Type': 'application/json' })
