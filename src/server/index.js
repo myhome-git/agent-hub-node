@@ -11,7 +11,6 @@
 
 import http from 'http'
 import { DatabaseManager } from './database.js'
-import { WebSocketManager } from './websocket.js'
 import { forwardRequest } from './gateway.js'
 import { initCleanupTask } from './cleanup.js'
 import CONFIG from './config.js'
@@ -57,13 +56,6 @@ export async function initGateway(options = {}) {
     const dbManager = new DatabaseManager(CONFIG.dbPath)
     await dbManager.ready
 
-    // 创建 WebSocket 管理器
-    const wsManager = new WebSocketManager(CONFIG.wsPort)
-    wsManager.init()
-
-    // 建立 WebSocket 与数据库的关联
-    wsManager.setDbManager(dbManager)
-
     // 初始化定时清理任务
     initCleanupTask(dbManager)
 
@@ -71,7 +63,6 @@ export async function initGateway(options = {}) {
 
     const managers = {
         dbManager,
-        wsManager,
         callback: {
             promptByteLen: (len) => {
                 netDataCount.bytesIn += len
@@ -143,9 +134,7 @@ export async function initGateway(options = {}) {
                     totalRequests: stats.summary.total_requests,
                     successRequests: stats.summary.total_success,
                     failedRequests: stats.summary.total_failed,
-                },
-                wsPort: CONFIG.wsPort,
-                wsConnections: wsManager.getConnectionCount(),
+                }
             }))
             return
         }
@@ -206,7 +195,6 @@ export async function initGateway(options = {}) {
         console.log('[Gateway] HTTP 转发网关已启动')
         console.log(`[Gateway] 监听地址: http://${host}:${port}`)
         console.log(`[Gateway] 目标服务: ${CONFIG.targetBaseUrl}`)
-        console.log(`[Gateway] WebSocket 监控: ws://${host}:${CONFIG.wsPort}`)
         console.log(`[Gateway] 数据库路径: ${CONFIG.dbPath}`)
         console.log(`[Gateway] 累计数据（Token）,输入:${totalPromptTokens}，输出：${totalCompletionTokens}，累计总：${totalTokens}，累计数据大小：${totalMB} MB
         `)
@@ -217,7 +205,6 @@ export async function initGateway(options = {}) {
     function gracefulShutdown() {
         console.log('[Gateway] 收到关闭信号，正在关闭服务...')
         server.close()
-        wsManager.close()
         dbManager.close()
         process.exit(0)
     }
@@ -227,7 +214,7 @@ export async function initGateway(options = {}) {
 
     // ==================== 返回管理器 ====================
 
-    return { dbManager, wsManager, server, forwardRequest, CONFIG, managers }
+    return { dbManager, server, forwardRequest, CONFIG, managers }
 }
 
 // ==================== 独立运行模式 ====================

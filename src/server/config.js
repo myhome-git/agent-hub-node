@@ -82,9 +82,6 @@ export const CONFIG = {
     cleanupDays: parseInt(process.env.CLEANUP_DAYS) || 30,
     cleanupIntervalMs: 3600000, // 清理间隔（1小时）
 
-    // WebSocket 配置
-    wsPort: parseInt(process.env.WS_PORT) || 9001,
-
     // 超时配置
     requestTimeout: parseInt(process.env.REQUEST_TIMEOUT) || 60000,
 }
