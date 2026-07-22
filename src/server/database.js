@@ -72,6 +72,9 @@ export class DatabaseManager {
     async addLogs(stats){
         const flelds = [
             'api_key_uuid',
+            'model',
+            'start_time',
+            'end_time',
             'prompt_tokens',
             'completion_tokens',
             'reasoning_tokens',

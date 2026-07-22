@@ -201,16 +201,26 @@ export function getDatePrevious(timestamp = Date.now(), format = '1M') {
 }
 
 /**
- * 格式化文件大小，将字节数转换为易读的格式
- * @param {number} bytes - 文件大小，单位字节
- * @returns {string} - 格式化后的文件大小字符串
+ * 格式化字节大小，将字节数转换为易读的格式
+ * @param {number} bytes - 字节数
+ * @param {number} decimals - 保留的小数位数，默认为 2
+ * @returns {string} 格式化后的字符串，如 '1.50 MB'
  */
-export function formatFileSize(bytes) {
-    if (bytes === 0) return '0 Bytes'
-    const k = 1024
-    const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB']
-    const i = Math.floor(Math.log(bytes) / Math.log(k))
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
+export function formatBytes(bytes, decimals = 2) {
+  // 处理 0 或无效输入
+  if (bytes === 0 || isNaN(bytes)) return '0 B'
+
+  // 1 KB = 1024 Bytes
+  const k = 1024
+  const units = ['B', 'KB', 'MB', 'GB', 'TB', 'PB']
+
+  // 通过以 1024 为底取对数，自动计算出应该使用哪个单位
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+
+  // 计算具体数值并拼接单位
+  const size = parseFloat((bytes / Math.pow(k, i)).toFixed(decimals))
+
+  return `${size} ${units[i]}`
 }
 
 /**

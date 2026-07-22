@@ -14,6 +14,7 @@ import { DatabaseManager } from './database.js'
 import { forwardRequest } from './gateway-target.js'
 import { initCleanupTask } from './cleanup.js'
 import CONFIG from './config.js'
+import { formatBytes } from '../utils/utils.js'
 
 /**
  * 初始化网关服务
@@ -185,10 +186,6 @@ export async function initGateway(options = {}) {
 
     // ==================== 启动服务 ====================
 
-    function formatMB(num){
-        return `${(num / 1024 / 1024).toFixed(2)} MB`
-    }
-
     server.listen(port, host, async() => {
         // 获取统计数据
         const stats = await dbManager.getStats()
@@ -203,8 +200,8 @@ export async function initGateway(options = {}) {
         console.log('[Gateway] HTTP 转发网关已启动')
         console.log(`[Gateway] 监听地址: http://${host}:${port}`)
         console.log(`[Gateway] 目标服务: ${targetApiURL}`)
-        console.log(`[Gateway] 累计数据\r\t\t（Token）,输入：${formatMB(totalPromptTokens)}，输出：${formatMB(totalCompletionTokens)}, 思考：${formatMB(totalReasoningTokens)}`)
-        console.log(`\t\t（Sizes）,输入：${formatMB(total_bytes_in)}，输出：${formatMB(total_bytes_out)}, 总大小：${formatMB(total_bytes_all)}`)
+        console.log(`[Gateway] 累计数据\r\t\t（Token）,输入：${formatBytes(totalPromptTokens)}，输出：${formatBytes(totalCompletionTokens)}, 思考：${formatBytes(totalReasoningTokens)}`)
+        console.log(`\t\t（Sizes）,输入：${formatBytes(total_bytes_in)}，输出：${formatBytes(total_bytes_out)}, 总大小：${formatBytes(total_bytes_all)}`)
     })
 
     // ==================== 优雅关闭 ====================

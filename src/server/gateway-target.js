@@ -224,7 +224,7 @@ export async function forwardRequest(req, res, targetUrl, managers, options = {}
         try {
             const bodyStr = fullBody.toString('utf-8')
             const bodyJson = JSON.parse(bodyStr)
-
+            tokenCounter.addModel(bodyJson.model || null)
             if (bodyJson.messages && Array.isArray(bodyJson.messages)) {
                 const promptText = bodyJson.messages.map(m => m.content).join('\n')
                 tokenCounter.add(promptText, 'prompt')
@@ -267,6 +267,7 @@ export async function forwardRequest(req, res, targetUrl, managers, options = {}
         callback.completeTokens(finalStats)
         dbManager.writeStats({
             'api_key_uuid': apiKey,
+            'model': finalStats.model,
             'start_time': startTime,
             'end_time': Date.now(),
             'prompt_tokens': finalStats.prompt,

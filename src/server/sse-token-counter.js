@@ -4,6 +4,7 @@ import { encoding_for_model } from '@dqbd/tiktoken' // 推荐使用 tiktoken
 export class TokenCounter {
     constructor(model = 'gpt-3.5-turbo') {
         this.encoder = encoding_for_model(model)
+        this.model = null
         this.bytesIn = 0
         this.bytesOut = 0
         this.promptTokens = 0
@@ -51,6 +52,9 @@ export class TokenCounter {
                     break
             }
     }
+    addModel(value){
+        this.model = value
+    }
 
     get currentTotal() {
         return this.promptTokens + this.completionTokens + this.reasoningTokens
@@ -58,11 +62,12 @@ export class TokenCounter {
 
     getFinalStats() {
         return {
+            model: this.model,
             bytesIn: this.bytesIn,
             bytesOut: this.bytesOut,
             prompt: this.promptTokens,
             completion: this.completionTokens,
-            reasoning: this.reasoningTokens, // 这是一个很有价值的数据点
+            reasoning: this.reasoningTokens,
             total: this.currentTotal
         }
     }
