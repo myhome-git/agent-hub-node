@@ -19,14 +19,14 @@ export function initCleanupTask(dbManager) {
     setTimeout(() => {
         try {
             if (!waitForDb()) {
-                console.log('[Cleanup] 数据库未初始化，跳过本次清理')
+                console.log('数据库未初始化，跳过本次清理')
                 return
             }
             const deleted = dbManager.cleanup()
             const count = Number(deleted) || 0
-            console.log(`[Cleanup] 清理完成: 删除了 ${count} 条过期记录`)
+            console.log(`清理完成: 删除了 ${count} 条过期记录`)
         } catch (error) {
-            console.error('[Cleanup] 清理任务执行失败:', error)
+            console.error('清理任务执行失败:', error)
         }
     }, 120000) // 2 分钟后首次执行
 
@@ -34,14 +34,14 @@ export function initCleanupTask(dbManager) {
     const interval = setInterval(() => {
         try {
             if (!waitForDb()) {
-                console.log('[Cleanup] 数据库未初始化，跳过本次清理')
+                console.log('数据库未初始化，跳过本次清理')
                 return
             }
             const deleted = dbManager.cleanup()
             const count = Number(deleted) || 0
-            console.log(`[Cleanup] 清理完成: 删除了 ${count} 条过期记录`)
+            console.log(`清理完成: 删除了 ${count} 条过期记录`)
         } catch (error) {
-            console.error('[Cleanup] 清理任务执行失败:', error)
+            console.error('清理任务执行失败:', error)
         }
     }, CONFIG.cleanupIntervalMs)
 
@@ -50,7 +50,7 @@ export function initCleanupTask(dbManager) {
         interval.unref()
     }
 
-    console.log(`[Cleanup] 定时清理任务已启动，间隔: ${CONFIG.cleanupIntervalMs / 3600000} 小时`)
+    console.log(`定时清理任务已启动，间隔: ${CONFIG.cleanupIntervalMs / 3600000} 小时`)
 }
 
 export default initCleanupTask

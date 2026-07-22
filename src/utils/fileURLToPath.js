@@ -1,5 +1,5 @@
-import { fileURLToPath } from 'url'
-import { dirname, resolve } from 'path'
+import { fileURLToPath } from 'node:url'
+import { dirname, resolve } from 'node:path'
 /**
  * 获得根目录
  * @returns

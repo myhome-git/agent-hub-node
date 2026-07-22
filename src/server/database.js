@@ -26,13 +26,13 @@ export class DatabaseManager {
         try {
             // 使用绝对路径，基于当前文件所在目录
             this.dbPath = path.resolve(getRootPath(), process.env.DB_PATH)
-            // console.log('[Database] database path:', this.dbPath)
+            // console.log('database path:', this.dbPath)
             // 加载现有数据库（如果存在）
             if (!fs.existsSync(this.dbPath)) {
-                console.log('[Database] 数据库文件不存在', this.dbPath)
+                console.log('数据库文件不存在', this.dbPath)
             }
         } catch (error) {
-            console.error('[Database] 初始化失败:', error)
+            console.error('初始化失败:', error)
             throw error
         }
     }
@@ -165,9 +165,9 @@ export class DatabaseManager {
                 this.db.close()
                 this.db = null
             }
-            console.log('[Database] 数据库连接已关闭')
+            console.log('数据库连接已关闭')
         } catch (error) {
-            console.log(`[Database] 数据库关闭失败，错误信息：${error.message}`)
+            console.log(`数据库关闭失败，错误信息：${error.message}`)
         }
     }
     /**

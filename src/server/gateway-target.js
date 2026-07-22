@@ -13,7 +13,7 @@ import CONFIG from './config.js'
  * 高性能字节流转发函数
  */
 export async function forwardRequest(req, res, targetUrl, managers, options = {}) {
-    // console.log('[Gateway] init')
+    // console.log('init')
 
     // 在你的网关中提取 API Key
     const authHeader = req.headers['authorization']
@@ -100,7 +100,7 @@ export async function forwardRequest(req, res, targetUrl, managers, options = {}
         // 首次响应处理
         if (!firstChunkSent && !res.headersSent) {
             const firstResponseTime = Date.now() - startTime
-            console.log(`[Gateway] 首字节响应: ${firstResponseTime}ms`)
+            console.log(`首字节响应: ${firstResponseTime}ms`)
             firstChunkSent = true
 
             // 【优化】清理并合并 Header
@@ -144,7 +144,7 @@ export async function forwardRequest(req, res, targetUrl, managers, options = {}
         })
 
         targetRes.on('end', () => {
-            console.log('[Gateway] 远程服务器 resp end')
+            console.log('远程服务器 resp end')
             tokenParser.flush()
             if(!res.writableEnded){
                 res.end()
@@ -152,7 +152,7 @@ export async function forwardRequest(req, res, targetUrl, managers, options = {}
         })
 
         targetRes.on('close', () => {
-            console.log('[Gateway] 远程服务器 resp close')
+            console.log('远程服务器 resp close')
             tokenParser.flush()
             if(!res.writableEnded){
                 res.end()
@@ -160,7 +160,7 @@ export async function forwardRequest(req, res, targetUrl, managers, options = {}
         })
 
         targetRes.on('error', (error) => {
-            console.error('[Gateway] 远程服务器 resp error', error.message)
+            console.error('远程服务器 resp error', error.message)
             if(!res.headersSent){
                 res.writeHead(502, CONFIG.CORS_HEADERS)
             }
@@ -171,7 +171,7 @@ export async function forwardRequest(req, res, targetUrl, managers, options = {}
     })
 
     targetReq.on('close', () => {
-        console.error('[Gateway] 远程服务器 req close')
+        console.error('远程服务器 req close')
         if(!res.headersSent){
             res.writeHead(502, CONFIG.CORS_HEADERS)
         }
@@ -182,7 +182,7 @@ export async function forwardRequest(req, res, targetUrl, managers, options = {}
 
     // 处理远程服务器请求错误
     targetReq.on('error', (error) => {
-        console.error('[Gateway] 远程服务器 req error', error.message)
+        console.error('远程服务器 req error', error.message)
         if(!res.headersSent){
             res.writeHead(502, CONFIG.CORS_HEADERS)
         }
@@ -193,7 +193,7 @@ export async function forwardRequest(req, res, targetUrl, managers, options = {}
 
     // 设置超时
     targetReq.setTimeout(timeout, () => {
-        console.warn(`[Gateway] 请求超时 (${timeout}ms): ${req.url}`)
+        console.warn(`请求超时 (${timeout}ms): ${req.url}`)
         if (isCompleted) return
         if (targetReq && !targetReq.destroyed) {
             targetReq.destroy()
@@ -219,7 +219,7 @@ export async function forwardRequest(req, res, targetUrl, managers, options = {}
     })
 
     req.on('end', () => {
-        // console.log('[Gateway] 客户端req end')
+        // console.log('客户端req end')
         const fullBody = Buffer.concat(reqBodyBuffer)
         try {
             const bodyStr = fullBody.toString('utf-8')
@@ -236,16 +236,16 @@ export async function forwardRequest(req, res, targetUrl, managers, options = {}
     })
 
     // req.on('close', () => {
-    //     console.log(`[Gateway] 客户端 req close: ${req.url}`)
+    //     console.log(`客户端 req close: ${req.url}`)
     // })
 
     req.on('error', () => {
-        console.log(`[Gateway] 客户端 req error: ${err.message}`)
+        console.log(`客户端 req error: ${err.message}`)
     })
 
     // response对象
     res.on('close', () => {
-        console.log(`[Gateway] 客户端 resp close: ${req.url}`)
+        console.log(`客户端 resp close: ${req.url}`)
         if (targetReq && !targetReq.destroyed) targetReq.destroy()
         if (targetResControl && !targetResControl.destroyed) targetResControl.destroy()
         if (!res.writableEnded) res.end()
@@ -253,7 +253,7 @@ export async function forwardRequest(req, res, targetUrl, managers, options = {}
     })
 
     res.on('error', (error) => {
-        console.error('[Gateway] 客户端 resp error:', error.message)
+        console.error('客户端 resp error:', error.message)
     })
 
     /**
@@ -262,7 +262,7 @@ export async function forwardRequest(req, res, targetUrl, managers, options = {}
     async function completeRequest(isSuccess) {
         if (isCompleted) return
         isCompleted = true
-        console.log(`[Gateway] 请求结束，状态: ${isSuccess ? '成功' : '失败'}`)
+        console.log(`请求结束，状态: ${isSuccess ? '成功' : '失败'}`)
         const finalStats = tokenCounter.getFinalStats()
         callback.completeTokens(finalStats)
         dbManager.writeStats({

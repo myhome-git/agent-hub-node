@@ -2,22 +2,15 @@
  * 网关配置文件
  * 支持从 .env.dev 文件加载环境变量
  */
-
-import { fileURLToPath } from 'url'
-import { dirname, join, resolve } from 'path'
+import { join } from 'path'
 import fs from 'fs'
-
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = dirname(__filename)
-
-// 计算项目根目录（src/server 的上一级）
-const projectRoot = resolve(__dirname, '../..')
+import { getRootPath } from '../utils/fileURLToPath.js'
 
 /**
  * 加载 .env.dev 文件
  */
 function loadEnvFile() {
-    const envPath = join(projectRoot, '.env.dev')
+    const envPath = join(getRootPath(), '.env.dev')
 
     if (fs.existsSync(envPath)) {
         try {
@@ -51,12 +44,12 @@ function loadEnvFile() {
                 }
             }
 
-            console.log('[Config] 已加载环境变量文件: .env.dev')
+            console.log('已加载环境变量文件: .env.dev')
         } catch (error) {
-            console.warn(`[Config] 加载 .env.dev 失败: ${error.message}`)
+            console.warn(`加载 .env.dev 失败: ${error.message}`)
         }
     } else {
-        console.error('[Config] 未找到 .env.dev 文件，使用默认配置')
+        console.error('未找到 .env.dev 文件，使用默认配置')
     }
 }
 

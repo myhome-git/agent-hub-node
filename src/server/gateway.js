@@ -86,7 +86,7 @@ export async function initGateway(options = {}) {
 
         // 300ms 内的重复请求拦截
         if (lastTime && (currentTime - lastTime < requestIntervalMs)) {
-            console.log('[Gateway] 拦截高频重复请求')
+            console.log('拦截高频重复请求')
             // 1. 使用标准的 429 状态码
             res.writeHead(429, CONFIG.CORS_HEADERS)
             res.end(JSON.stringify({
@@ -197,17 +197,17 @@ export async function initGateway(options = {}) {
         const total_bytes_out = summary.total_bytes_out || 0
         const total_bytes_all = total_bytes_in + total_bytes_out
 
-        console.log('[Gateway] HTTP 转发网关已启动')
-        console.log(`[Gateway] 监听地址: http://${host}:${port}`)
-        console.log(`[Gateway] 目标服务: ${targetApiURL}`)
-        console.log(`[Gateway] 累计数据\r\t\t（Token）,输入：${formatBytes(totalPromptTokens)}，输出：${formatBytes(totalCompletionTokens)}, 思考：${formatBytes(totalReasoningTokens)}`)
-        console.log(`\t\t（Sizes）,输入：${formatBytes(total_bytes_in)}，输出：${formatBytes(total_bytes_out)}, 总大小：${formatBytes(total_bytes_all)}`)
+        console.log('HTTP 转发网关已启动')
+        console.log(`监听地址: http://${host}:${port}`)
+        console.log(`目标服务: ${targetApiURL}`)
+        console.log(`累计数据（Token）,输入：${formatBytes(totalPromptTokens)}，输出：${formatBytes(totalCompletionTokens)}, 思考：${formatBytes(totalReasoningTokens)}`)
+        console.log(`累计数据（Sizes）,输入：${formatBytes(total_bytes_in)}，输出：${formatBytes(total_bytes_out)}, 总大小：${formatBytes(total_bytes_all)}`)
     })
 
     // ==================== 优雅关闭 ====================
 
     function gracefulShutdown() {
-        console.log('[Gateway] 收到关闭信号，正在关闭服务...')
+        console.log('收到关闭信号，正在关闭服务...')
         server.close()
         dbManager.close()
         process.exit(0)
