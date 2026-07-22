@@ -214,13 +214,13 @@ export async function forwardRequest(req, res, targetUrl, managers, options = {}
 
     req.on('data', (chunk) => {
         reqBodyBuffer.push(chunk)
-        tokenCounter.addBytesLen(chunk, 'in')
         targetReq.write(chunk)
     })
 
     req.on('end', () => {
         // console.log('客户端req end')
         const fullBody = Buffer.concat(reqBodyBuffer)
+        tokenCounter.addBytesLen(fullBody, 'in')
         try {
             const bodyStr = fullBody.toString('utf-8')
             const bodyJson = JSON.parse(bodyStr)
