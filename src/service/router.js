@@ -1,6 +1,7 @@
 import fs from 'fs'
 import path from 'path'
 import { Hono } from 'hono'
+import { getRootPath } from '@/utils/fileURLToPath'
 
 // 路由功能
 export default async function useRouter(app) {
@@ -11,7 +12,7 @@ export default async function useRouter(app) {
     })
 
     // 如果需要启用目录扫描功能
-    const dbPath = path.resolve(process.cwd(), process.env.ROUTER_PATH)
+    const dbPath = path.resolve(getRootPath(), process.env.ROUTER_PATH)
     const dynamicRoutes = await loadRoutesFromDirectory(dbPath)
     // console.log(`遍历出的动态路由`, dynamicRoutes)
 

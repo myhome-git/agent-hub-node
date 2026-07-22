@@ -6,11 +6,8 @@
  */
 
 import { spawn } from 'child_process'
-import { fileURLToPath } from 'url'
-import { dirname, join } from 'path'
-
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = dirname(__filename)
+import { join } from 'path'
+import { getSrcPath } from './utils/fileURLToPath.js'
 
 /**
  * 创建子进程并包装输出
@@ -26,7 +23,7 @@ function createProcess(command, args, name) {
     const child = spawn(commandStr, {
         stdio: 'inherit', // 继承标准输入/输出
         env: { ...process.env }, // 继承环境变量
-        cwd: process.cwd(), // 使用当前工作目录
+        cwd: getSrcPath(), // 使用当前工作目录
         shell: true, // 使用 shell 以兼容 Windows
     })
 
@@ -84,15 +81,15 @@ function main() {
 
     const processes = new Map()
 
+    // ==================== 启动 Gateway 服务 ====================
+    const gatewayPath = join(getSrcPath(), 'server', 'index.js')
+    const gatewayProcess = createProcess('node', [gatewayPath], 'Gateway (后端服务)')
+    processes.set('Gateway', gatewayProcess)
+
     // ==================== 启动 Vite 开发服务器 ====================
     // 使用 node + npm 启动，兼容 Windows
     const viteProcess = createProcess('npm', ['run', 'dev'], 'Vite (前端开发服务器)')
     processes.set('Vite', viteProcess)
-
-    // ==================== 启动 Gateway 服务 ====================
-    const gatewayPath = join(__dirname, 'server', 'index.js')
-    const gatewayProcess = createProcess('node', [gatewayPath], 'Gateway (后端服务)')
-    processes.set('Gateway', gatewayProcess)
 
     // ==================== 监听子进程信号 ====================
 

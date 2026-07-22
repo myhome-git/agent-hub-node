@@ -27,7 +27,6 @@
     "hono-sessions": "^0.8.0",
     "module-alias": "^2.2.3",
     "path": "^0.12.7",
-    "sql.js": "^1.14.1",
     "typescript": "^5.9.3"
   },
   "_moduleAliases": {

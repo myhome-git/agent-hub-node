@@ -1,6 +1,6 @@
-// import db from "@/db/db_myblog.sqlite";
 import { Database } from 'bun:sqlite'
 import path from 'path'
+import { getRootPath } from '@/utils/fileURLToPath'
 
 /**
  * 数据库连接封装类接口
@@ -22,7 +22,7 @@ class ClassDBConnection {
     }
     open() {
         try{
-            const dbPath = path.resolve(process.cwd(), process.env.DB_PATH)
+            const dbPath = path.resolve(getRootPath(), process.env.DB_PATH)
             this.DB = new Database(dbPath)
         }catch(error){
             console.error(error)

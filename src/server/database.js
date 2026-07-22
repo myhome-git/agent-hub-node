@@ -1,11 +1,11 @@
 /**
  * 数据库管理器
- * 使用 sql.js（纯 JavaScript SQLite 实现，无需编译 native 代码）
  * 负责数据库自动初始化、按分钟统计写入、定时清理
  */
 import { DatabaseSync } from 'node:sqlite'
 import path from 'path'
 import fs from 'fs'
+import { getRootPath } from '../utils/fileURLToPath.js'
 // import dayjs from 'dayjs'
 
 /**
@@ -25,7 +25,7 @@ export class DatabaseManager {
     init() {
         try {
             // 使用绝对路径，基于当前文件所在目录
-            this.dbPath = path.resolve(process.cwd(), process.env.DB_PATH)
+            this.dbPath = path.resolve(getRootPath(), process.env.DB_PATH)
             // console.log('[Database] database path:', this.dbPath)
             // 加载现有数据库（如果存在）
             if (!fs.existsSync(this.dbPath)) {
@@ -105,6 +105,8 @@ export class DatabaseManager {
         `
         const resultSearch = await this.query(sqlValueSearch, [])
         const resultSearchValue = resultSearch[0]
+
+        await this.query('DELETE FROM stats_summary', [])
         const flelds = [
             'total_prompt_tokens',
             'total_completion_tokens',
@@ -119,7 +121,6 @@ export class DatabaseManager {
             VALUES 
                 (?, ${flelds.map(() => '?').join(',')})
         `
-        await this.query('DELETE FROM stats_summary', [])
         return this.query(sqlValue, [1, ...flelds.map((item) => resultSearchValue[item])])
     }
 
