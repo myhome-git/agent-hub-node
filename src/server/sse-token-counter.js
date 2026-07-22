@@ -52,6 +52,9 @@ export class TokenCounter {
                     break
             }
     }
+    setAttr(key, value){
+        this[key] = value
+    }
     addModel(value){
         this.model = value
     }

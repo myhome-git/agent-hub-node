@@ -102,6 +102,7 @@ export async function forwardRequest(req, res, targetUrl, managers, options = {}
             const firstResponseTime = Date.now() - startTime
             console.log(`首字节响应: ${firstResponseTime}ms`)
             firstChunkSent = true
+            tokenCounter.setAttr('bytesIn', Number(req.headers['content-length']) || 0)
 
             // 【优化】清理并合并 Header
             const cleanHeaders = { ...targetRes.headers }
@@ -220,7 +221,6 @@ export async function forwardRequest(req, res, targetUrl, managers, options = {}
     req.on('end', () => {
         // console.log('客户端req end')
         const fullBody = Buffer.concat(reqBodyBuffer)
-        tokenCounter.addBytesLen(fullBody, 'in')
         try {
             const bodyStr = fullBody.toString('utf-8')
             const bodyJson = JSON.parse(bodyStr)
