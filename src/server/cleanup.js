@@ -1,11 +1,4 @@
 /**
- * 定时清理任务模块
- * 每小时清理一次过期数据
- */
-
-import CONFIG from './config.js'
-
-/**
  * 初始化定时清理任务
  * @param {Object} dbManager - 数据库管理器实例
  */
@@ -30,7 +23,7 @@ export function initCleanupTask(dbManager) {
         }
     }, 120000) // 2 分钟后首次执行
 
-    // 之后按配置间隔执行（每 3600 秒 = 1 小时）
+    // 定时任务
     const interval = setInterval(() => {
         try {
             if (!waitForDb()) {
@@ -43,14 +36,14 @@ export function initCleanupTask(dbManager) {
         } catch (error) {
             console.error('清理任务执行失败:', error)
         }
-    }, CONFIG.cleanupIntervalMs)
+    }, process.env.CLEANUP_INTERVAL_MS)
 
     // 允许进程在不等待定时任务的情况下退出
     if (interval && interval.unref) {
         interval.unref()
     }
 
-    console.log(`定时清理任务已启动，间隔: ${CONFIG.cleanupIntervalMs / 3600000} 小时`)
+    console.log('定时清理任务已启动')
 }
 
 export default initCleanupTask

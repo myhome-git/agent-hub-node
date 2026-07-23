@@ -27,6 +27,9 @@ console.log(`
     ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
 `)
 
+// 加载变量
+loadEnvFile()
+
 // 1. 保存原始的 console 方法，防止死循环
 const originalConsole = {
   log: console.log.bind(console),
@@ -37,12 +40,18 @@ const originalConsole = {
 
 // 2. 重写全局 console 对象的方法
 const methods = ['log', 'warn', 'error', 'info']
+const methodsFilter = `${process.env.CONSOLE_LOG}`.replace(/\s/g, '').split(',').map(method => method.toLowerCase())
+// console.log(process.env.CONSOLE_LOG, methodsFilter)
 methods.forEach(method => {
+  if (methodsFilter.includes(method)){
     console[method] = (...args) => {
         const time = dayjs(Date.now()).format('YYYY-MM-DD HH:mm:ss')
         const file = getCallerFileName()
         originalConsole[method](`[${time}] [${file}]`, ...args)
     }
+  } else {
+    console[method] = () => {}
+  }
 })
 
 function getCallerFileName() {
@@ -70,5 +79,4 @@ function getCallerFileName() {
       return 'Unknown'
     }
 }
-loadEnvFile()
 initGateway()

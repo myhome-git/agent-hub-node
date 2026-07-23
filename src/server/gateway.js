@@ -118,52 +118,6 @@ export async function initGateway(options = {}) {
         const url = new URL(req.url || '/', `${protocol}://${req.headers.host || 'localhost'}`)
         const pathname = url.pathname.replace('/v1', `/${process.env.TARGET_API_VERSION}`)
 
-        // 健康检查
-        if (pathname === '/health' && req.method === 'GET') {
-            const stats = dbManager.getStats()
-            const memoryUsage = process.memoryUsage()
-
-            res.writeHead(200, { 'Content-Type': 'application/json' })
-            res.end(JSON.stringify({
-                status: 'ok',
-                timestamp: new Date().toISOString(),
-                uptime: process.uptime(),
-                memory: {
-                    rss: `${Math.round(memoryUsage.rss / 1024 / 1024)} MB`,
-                    heapUsed: `${Math.round(memoryUsage.heapUsed / 1024 / 1024)} MB`,
-                    heapTotal: `${Math.round(memoryUsage.heapTotal / 1024 / 1024)} MB`,
-                },
-                stats: {
-                    totalRequests: stats.summary.total_requests,
-                    successRequests: stats.summary.total_success,
-                    failedRequests: stats.summary.total_failed,
-                }
-            }))
-            return
-        }
-
-        // 获取统计数据
-        if (pathname === '/api/stats' && req.method === 'GET') {
-            const stats = dbManager.getStats()
-            res.writeHead(200, { 'Content-Type': 'application/json' })
-            res.end(JSON.stringify({
-                timestamp: new Date().toISOString(),
-                data: stats,
-            }))
-            return
-        }
-
-        // 重置统计数据
-        if (pathname === '/api/stats/reset' && req.method === 'POST') {
-            dbManager.reset()
-            res.writeHead(200, { 'Content-Type': 'application/json' })
-            res.end(JSON.stringify({
-                message: '统计数据已重置',
-                timestamp: new Date().toISOString(),
-            }))
-            return
-        }
-
         // 转发请求到目标服务
         const targetURL = `${targetApiURL}${pathname}${url.search}`
         console.log(`[index] ${req.method} ${req.url} -> ${targetURL}`)
@@ -174,7 +128,7 @@ export async function initGateway(options = {}) {
             console.error('[index] 转发失败:', error)
 
             if (!res.headersSent) {
-                res.writeHead(500, { 'Content-Type': 'application/json' })
+                res.writeHead(500, CONFIG.CORS_HEADERS)
             }
             res.end(JSON.stringify({
                 error: 'Internal Server Error',
@@ -197,17 +151,17 @@ export async function initGateway(options = {}) {
         const total_bytes_out = summary.total_bytes_out || 0
         const total_bytes_all = total_bytes_in + total_bytes_out
 
-        console.log('HTTP 转发网关已启动')
-        console.log(`监听地址: http://${host}:${port}`)
-        console.log(`目标服务: ${targetApiURL}`)
-        console.log(`累计数据（Token）,输入：${formatBytes(totalPromptTokens)}，输出：${formatBytes(totalCompletionTokens)}, 思考：${formatBytes(totalReasoningTokens)}`)
-        console.log(`累计数据（Sizes）,输入：${formatBytes(total_bytes_in)}，输出：${formatBytes(total_bytes_out)}, 总大小：${formatBytes(total_bytes_all)}`)
+        console.info('HTTP 转发网关已启动')
+        console.info(`监听地址: http://${host}:${port}`)
+        console.info(`目标服务: ${targetApiURL}`)
+        console.info(`累计数据（Token）,输入：${formatBytes(totalPromptTokens)}，输出：${formatBytes(totalCompletionTokens)}, 思考：${formatBytes(totalReasoningTokens)}`)
+        console.info(`累计数据（Sizes）,输入：${formatBytes(total_bytes_in)}，输出：${formatBytes(total_bytes_out)}, 总大小：${formatBytes(total_bytes_all)}`)
     })
 
     // ==================== 优雅关闭 ====================
 
     function gracefulShutdown() {
-        console.log('收到关闭信号，正在关闭服务...')
+        console.info('收到关闭信号，正在关闭服务...')
         server.close()
         dbManager.close()
         process.exit(0)

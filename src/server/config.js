@@ -4,10 +4,6 @@
  * 优先使用环境变量，其次使用 .env.dev 文件，最后使用默认值
  */
 export const CONFIG = {
-    // 清理配置
-    cleanupDays: parseInt(process.env.CLEANUP_DAYS) || 30,
-    cleanupIntervalMs: 3600000, // 清理间隔（1小时）
-
     // 超时配置
     CORS_HEADERS: {
         'Access-Control-Allow-Origin': '*',

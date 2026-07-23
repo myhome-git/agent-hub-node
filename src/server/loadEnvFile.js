@@ -44,7 +44,7 @@ function loadEnvFile() {
                 }
             }
 
-            console.log('已加载环境变量文件: .env.dev')
+            console.info('已加载环境变量文件: .env.dev')
         } catch (error) {
             console.warn(`加载 .env.dev 失败: ${error.message}`)
         }

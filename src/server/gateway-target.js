@@ -172,7 +172,7 @@ export async function forwardRequest(req, res, targetUrl, managers, options = {}
     })
 
     targetReq.on('close', () => {
-        console.error('远程服务器 req close')
+        console.log('远程服务器 req close')
         if(!res.headersSent){
             res.writeHead(502, CONFIG.CORS_HEADERS)
         }
@@ -194,7 +194,7 @@ export async function forwardRequest(req, res, targetUrl, managers, options = {}
 
     // 设置超时
     targetReq.setTimeout(timeout, () => {
-        console.warn(`请求超时 (${timeout}ms): ${req.url}`)
+        console.error(`请求超时 (${timeout}ms): ${req.url}`)
         if (isCompleted) return
         if (targetReq && !targetReq.destroyed) {
             targetReq.destroy()
@@ -219,7 +219,7 @@ export async function forwardRequest(req, res, targetUrl, managers, options = {}
     })
 
     req.on('end', () => {
-        // console.log('客户端req end')
+        // console.log('客户端 req end')
         const fullBody = Buffer.concat(reqBodyBuffer)
         try {
             const bodyStr = fullBody.toString('utf-8')
@@ -240,7 +240,7 @@ export async function forwardRequest(req, res, targetUrl, managers, options = {}
     // })
 
     req.on('error', () => {
-        console.log(`客户端 req error: ${err.message}`)
+        console.error(`客户端 req error: ${err.message}`)
     })
 
     // response对象

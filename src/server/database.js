@@ -29,7 +29,7 @@ export class DatabaseManager {
             // console.log('database path:', this.dbPath)
             // 加载现有数据库（如果存在）
             if (!fs.existsSync(this.dbPath)) {
-                console.log('数据库文件不存在', this.dbPath)
+                console.error('数据库文件不存在', this.dbPath)
             }
         } catch (error) {
             console.error('初始化失败:', error)
@@ -165,9 +165,8 @@ export class DatabaseManager {
                 this.db.close()
                 this.db = null
             }
-            console.log('数据库连接已关闭')
         } catch (error) {
-            console.log(`数据库关闭失败，错误信息：${error.message}`)
+            console.error(`数据库关闭失败，错误信息：${error.message}`)
         }
     }
     /**
