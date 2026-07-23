@@ -1,5 +1,5 @@
 /**
- * 核心字节流转发模块 (适配 Chatbox + 本地大模型)
+ * 核心字节流转发模块
  * 使用 Node.js 原生 http 模块进行高性能请求转发
  */
 
@@ -45,7 +45,7 @@ export async function forwardRequest(req, res, targetUrl, managers, options = {}
     const tokenParser = new SSETokenParser()
     const tokenCounter = new TokenCounter()
 
-    const { dbManager, callback } = managers
+    const { dbManager } = managers
 
     // 准备请求选项
     const url = new URL(targetUrl)
@@ -95,12 +95,15 @@ export async function forwardRequest(req, res, targetUrl, managers, options = {}
         targetResControl = targetRes
         // 【优化】提前判断是否为流式响应，以便在发送 Header 前清理冲突字段
         const contentType = targetRes.headers['content-type'] || ''
-        const isStream = contentType.includes('text/event-stream') || contentType.includes('application/octet-stream')
+        const isStream = contentType.includes('text/event-stream')
+            || contentType.includes('application/octet-stream')
+            || contentType.includes('multipart/form-data')
 
         // 首次响应处理
         if (!firstChunkSent && !res.headersSent) {
             const firstResponseTime = Date.now() - startTime
-            console.log(`首字节响应: ${firstResponseTime}ms`)
+            console.info(`远程服务器 首字节响应: ${firstResponseTime}ms，API_KEY：${apiKey}`)
+
             firstChunkSent = true
             tokenCounter.setAttr('bytesIn', Number(req.headers['content-length']) || 0)
 
@@ -264,8 +267,7 @@ export async function forwardRequest(req, res, targetUrl, managers, options = {}
         isCompleted = true
         console.log(`请求结束，状态: ${isSuccess ? '成功' : '失败'}`)
         const finalStats = tokenCounter.getFinalStats()
-        callback.completeTokens(finalStats)
-        dbManager.writeStats({
+        dbManager.addLogs({
             'api_key_uuid': apiKey,
             'model': finalStats.model,
             'start_time': startTime,

@@ -89,12 +89,12 @@ export class DatabaseManager {
             VALUES 
                 (${flelds.map(() => '?').join(',')},?)
         `
-        return this.query(sqlValue, [...flelds.map((item) => stats[item]), Date.now()])
+        await this.query(sqlValue, [...flelds.map((item) => stats[item]), Date.now()])
+        await this.writeStats()
+        console.info(`数据库写入数据成功，API_KEY：${stats.api_key_uuid}`)
     }
 
-    async writeStats(stats){
-        await this.addLogs(stats)
-
+    async writeStats(){
         // 汇总更新
         const sqlValueSearch = `
             SELECT 
@@ -152,8 +152,14 @@ export class DatabaseManager {
     /**
      * 重置统计数据
      */
-    reset() {
+    async reset() {
 
+        // 清除历史记录表
+        sqlValue = 'DELETE FROM tb_logs'
+        await this.query(sqlValue, [])
+
+        // 清除汇总表数据
+        await this.writeStats()
     }
 
     /**

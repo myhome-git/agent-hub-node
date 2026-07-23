@@ -31,17 +31,6 @@ export async function initGateway(options = {}) {
 
     // ==================== 初始化模块 ====================
 
-    // 创建统计类对象
-    const netDataCount = {
-        // 统计变量
-        bytesIn: 0,
-        bytesOut: 0,
-        promptTokens: 0, //  (提示词 Token 数)
-        completionTokens: 0, //  (生成/回答 Token 数)
-        totalTokens: 0, // (总 Token 数)，本次交互消耗的总算力单位。计算公式：通常为 prompt + completion + reasoning。
-        reasoningTokens: 0 // (推理/思考 Token 数)
-    }
-
     // 创建数据库管理器（等待初始化完成）
     const dbManager = new DatabaseManager()
     await dbManager.ready
@@ -52,16 +41,7 @@ export async function initGateway(options = {}) {
     // ==================== 管理器集合 ====================
 
     const managers = {
-        dbManager,
-        callback: {
-            completeTokens: ({ prompt, completion, reasoning, total }) => {
-                // { prompt: 0, completion: 0, reasoning: 1385, total: 1385 }
-                netDataCount.promptTokens += prompt
-                netDataCount.completionTokens += completion
-                netDataCount.reasoningTokens += reasoning
-                netDataCount.totalTokens += total
-            }
-        }
+        dbManager, // 数据库管理器对象
     }
 
     // ==================== HTTP 服务器 ====================
